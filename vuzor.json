@@ -9702,254 +9702,254 @@
     "slovian": "obrazy"
   },
   {
-    "type and case": "noun - jimenьnik: \"vědja\" | nominative - jimenovьnik (koto? čьto?) | singular - poedinьna ličьba | type feminine (inanimate) - rodjajь ženьsky (neživotьny)",
+    "type and case": "noun - jimenьnik: \"věda\" | nominative - jimenovьnik (koto? čьto?) | singular - poedinьna ličьba | type feminine (inanimate) - rodjajь ženьsky (neživotьny)",
     "context": "knowledge, know-how",
     "polish": "wiedza",
-    "slovian": "vědja"
+    "slovian": "věda"
   },
   {
-    "type and case": "noun - jimenьnik: \"vědja\" | accusative - vinьnik (kogo? čьto?) | singular - poedinьna ličьba | type feminine (inanimate) - rodjajь ženьsky (neživotьny)",
+    "type and case": "noun - jimenьnik: \"věda\" | accusative - vinьnik (kogo? čьto?) | singular - poedinьna ličьba | type feminine (inanimate) - rodjajь ženьsky (neživotьny)",
     "context": "knowledge, know-how",
     "polish": "wiedzę",
-    "slovian": "vědjǫ"
+    "slovian": "vědǫ"
   },
   {
-    "type and case": "noun - jimenьnik: \"vědja\" | genitive - rodilьnik (kogo? čego?) | singular - poedinьna ličьba | type feminine (inanimate) - rodjajь ženьsky (neživotьny)",
+    "type and case": "noun - jimenьnik: \"věda\" | genitive - rodilьnik (kogo? čego?) | singular - poedinьna ličьba | type feminine (inanimate) - rodjajь ženьsky (neživotьny)",
+    "context": "knowledge, know-how",
+    "polish": "wiedzy",
+    "slovian": "vědy"
+  },
+  {
+    "type and case": "noun - jimenьnik: \"věda\" | locative - městьnik (ob kom? ob čem? kude? vu? na? pri?) | singular - poedinьna ličьba | type feminine (inanimate) - rodjajь ženьsky (neživotьny)",
     "context": "knowledge, know-how",
     "polish": "wiedzy",
     "slovian": "vědě"
   },
   {
-    "type and case": "noun - jimenьnik: \"vědja\" | locative - městьnik (ob kom? ob čem? kude? vu? na? pri?) | singular - poedinьna ličьba | type feminine (inanimate) - rodjajь ženьsky (neživotьny)",
+    "type and case": "noun - jimenьnik: \"věda\" | dative - měrьnik (komu? czemu?) | singular - poedinьna ličьba | type feminine (inanimate) - rodjajь ženьsky (neživotьny)",
     "context": "knowledge, know-how",
     "polish": "wiedzy",
-    "slovian": "vědji"
+    "slovian": "vědě"
   },
   {
-    "type and case": "noun - jimenьnik: \"vědja\" | dative - měrьnik (komu? czemu?) | singular - poedinьna ličьba | type feminine (inanimate) - rodjajь ženьsky (neživotьny)",
-    "context": "knowledge, know-how",
-    "polish": "wiedzy",
-    "slovian": "vědji"
-  },
-  {
-    "type and case": "noun - jimenьnik: \"vědja\" | instrumental - orǫdьnik (su kymь? su čimь? su jakymь?) | singular - poedinьna ličьba | type feminine (inanimate) - rodjajь ženьsky (neživotьny)",
+    "type and case": "noun - jimenьnik: \"věda\" | instrumental - orǫdьnik (su kymь? su čimь? su jakymь?) | singular - poedinьna ličьba | type feminine (inanimate) - rodjajь ženьsky (neživotьny)",
     "context": "knowledge, know-how",
     "polish": "wiedzą",
-    "slovian": "vědějǫ"
+    "slovian": "vědojǫ"
   },
   {
-    "type and case": "noun - jimenьnik: \"vědja\" | vocative - zovanьnik (o!) | singular - poedinьna ličьba | type feminine (inanimate) - rodjajь ženьsky (neživotьny)",
+    "type and case": "noun - jimenьnik: \"věda\" | vocative - zovanьnik (o!) | singular - poedinьna ličьba | type feminine (inanimate) - rodjajь ženьsky (neživotьny)",
     "context": "knowledge, know-how",
     "polish": "wiedzo",
-    "slovian": "vědje"
+    "slovian": "vědo"
   },
   {
-    "type and case": "noun - jimenьnik: \"vědja\" | nominative - jimenovьnik (koto? čьto?) | plural - munoga ličьba | type feminine (inanimate) - rodjajь ženьsky (neživotьny)",
+    "type and case": "noun - jimenьnik: \"věda\" | nominative - jimenovьnik (koto? čьto?) | plural - munoga ličьba | type feminine (inanimate) - rodjajь ženьsky (neživotьny)",
     "context": "knowledge, know-hows",
     "polish": "wiedze",
-    "slovian": "vědje"
+    "slovian": "vědy"
   },
   {
-    "type and case": "noun - jimenьnik: \"vědja\" | accusative - vinьnik (kogo? čьto?) | plural - munoga ličьba | type feminine (inanimate) - rodjajь ženьsky (neživotьny)",
+    "type and case": "noun - jimenьnik: \"věda\" | accusative - vinьnik (kogo? čьto?) | plural - munoga ličьba | type feminine (inanimate) - rodjajь ženьsky (neživotьny)",
     "context": "knowledge, know-hows",
     "polish": "wiedze",
-    "slovian": "vědje"
+    "slovian": "vědy"
   },
   {
-    "type and case": "noun - jimenьnik: \"vědja\" | genitive - rodilьnik (kogo? čego?) | plural - munoga ličьba | type feminine (inanimate) - rodjajь ženьsky (neživotьny)",
+    "type and case": "noun - jimenьnik: \"věda\" | genitive - rodilьnik (kogo? čego?) | plural - munoga ličьba | type feminine (inanimate) - rodjajь ženьsky (neživotьny)",
     "context": "knowledge, know-hows",
     "polish": "wiedz",
-    "slovian": "vědjь"
+    "slovian": "věd"
   },
   {
-    "type and case": "noun - jimenьnik: \"vědja\" | locative - městьnik (ob kom? ob čem? kude? vu? na? pri?) | plural - munoga ličьba | type feminine (inanimate) - rodjajь ženьsky (neživotьny)",
+    "type and case": "noun - jimenьnik: \"věda\" | locative - městьnik (ob kom? ob čem? kude? vu? na? pri?) | plural - munoga ličьba | type feminine (inanimate) - rodjajь ženьsky (neživotьny)",
     "context": "knowledge, know-hows",
     "polish": "wiedzach",
-    "slovian": "vědjah"
+    "slovian": "vědah"
   },
   {
-    "type and case": "noun - jimenьnik: \"vědja\" | dative - měrьnik (komu? czemu?) | plural - munoga ličьba | type feminine (inanimate) - rodjajь ženьsky (neživotьny)",
+    "type and case": "noun - jimenьnik: \"věda\" | dative - měrьnik (komu? czemu?) | plural - munoga ličьba | type feminine (inanimate) - rodjajь ženьsky (neživotьny)",
     "context": "knowledge, know-hows",
     "polish": "wiedzom",
-    "slovian": "vědjam"
+    "slovian": "vědam"
   },
   {
-    "type and case": "noun - jimenьnik: \"vědja\" | instrumental - orǫdьnik (su kymь? su čimь? su jakymь?) | plural - munoga ličьba | type feminine (inanimate) - rodjajь ženьsky (neživotьny)",
+    "type and case": "noun - jimenьnik: \"věda\" | instrumental - orǫdьnik (su kymь? su čimь? su jakymь?) | plural - munoga ličьba | type feminine (inanimate) - rodjajь ženьsky (neživotьny)",
     "context": "knowledge, know-hows",
     "polish": "wiedzami",
-    "slovian": "vědjami"
+    "slovian": "vědami"
   },
   {
-    "type and case": "noun - jimenьnik: \"vědja\" | vocative - zovanьnik (o!) | plural - munoga ličьba | type feminine (inanimate) - rodjajь ženьsky (neživotьny)",
+    "type and case": "noun - jimenьnik: \"věda\" | vocative - zovanьnik (o!) | plural - munoga ličьba | type feminine (inanimate) - rodjajь ženьsky (neživotьny)",
     "context": "knowledge, know-hows",
     "polish": "wiedze",
-    "slovian": "vědje"
+    "slovian": "vědy"
   },
   {
-    "type and case": "noun - jimenьnik: \"vědja\" | nominative - jimenovьnik (koto? čьto?) | singular - poedinьna ličьba | type feminine (inanimate) - rodjajь ženьsky (neživotьny)",
+    "type and case": "noun - jimenьnik: \"edьnota\" | nominative - jimenovьnik (koto? čьto?) | singular - poedinьna ličьba | type feminine (inanimate) - rodjajь ženьsky (neživotьny)",
     "context": "unity",
     "polish": "jednota",
     "slovian": "edьnota"
   },
   {
-    "type and case": "noun - jimenьnik: \"vědja\" | accusative - vinьnik (kogo? čьto?) | singular - poedinьna ličьba | type feminine (inanimate) - rodjajь ženьsky (neživotьny)",
+    "type and case": "noun - jimenьnik: \"edьnota\" | accusative - vinьnik (kogo? čьto?) | singular - poedinьna ličьba | type feminine (inanimate) - rodjajь ženьsky (neživotьny)",
     "context": "unity",
     "polish": "jednotę",
     "slovian": "edьnotǫ"
   },
   {
-    "type and case": "noun - jimenьnik: \"vědja\" | genitive - rodilьnik (kogo? čego?) | singular - poedinьna ličьba | type feminine (inanimate) - rodjajь ženьsky (neživotьny)",
+    "type and case": "noun - jimenьnik: \"edьnota\" | genitive - rodilьnik (kogo? čego?) | singular - poedinьna ličьba | type feminine (inanimate) - rodjajь ženьsky (neživotьny)",
     "context": "unity",
     "polish": "jednoty",
     "slovian": "edьnoty"
   },
   {
-    "type and case": "noun - jimenьnik: \"vědja\" | locative - městьnik (ob kom? ob čem? kude? vu? na? pri?) | singular - poedinьna ličьba | type feminine (inanimate) - rodjajь ženьsky (neživotьny)",
+    "type and case": "noun - jimenьnik: \"edьnota\" | locative - městьnik (ob kom? ob čem? kude? vu? na? pri?) | singular - poedinьna ličьba | type feminine (inanimate) - rodjajь ženьsky (neživotьny)",
     "context": "unity",
     "polish": "jednocie",
     "slovian": "edьnotě"
   },
   {
-    "type and case": "noun - jimenьnik: \"vědja\" | dative - měrьnik (komu? czemu?) | singular - poedinьna ličьba | type feminine (inanimate) - rodjajь ženьsky (neživotьny)",
+    "type and case": "noun - jimenьnik: \"edьnota\" | dative - měrьnik (komu? czemu?) | singular - poedinьna ličьba | type feminine (inanimate) - rodjajь ženьsky (neživotьny)",
     "context": "unity",
     "polish": "jednocie",
     "slovian": "edьnotě"
   },
   {
-    "type and case": "noun - jimenьnik: \"vědja\" | instrumental - orǫdьnik (su kymь? su čimь? su jakymь?) | singular - poedinьna ličьba | type feminine (inanimate) - rodjajь ženьsky (neživotьny)",
+    "type and case": "noun - jimenьnik: \"edьnota\" | instrumental - orǫdьnik (su kymь? su čimь? su jakymь?) | singular - poedinьna ličьba | type feminine (inanimate) - rodjajь ženьsky (neživotьny)",
     "context": "unity",
     "polish": "jednotą",
     "slovian": "edьnotojǫ"
   },
   {
-    "type and case": "noun - jimenьnik: \"vědja\" | vocative - zovanьnik (o!) | singular - poedinьna ličьba | type feminine (inanimate) - rodjajь ženьsky (neživotьny)",
+    "type and case": "noun - jimenьnik: \"edьnota\" | vocative - zovanьnik (o!) | singular - poedinьna ličьba | type feminine (inanimate) - rodjajь ženьsky (neživotьny)",
     "context": "unity",
     "polish": "jednoto",
     "slovian": "edьnoto"
   },
   {
-    "type and case": "noun - jimenьnik: \"vědja\" | nominative - jimenovьnik (koto? čьto?) | plural - munoga ličьba | type feminine (inanimate) - rodjajь ženьsky (neživotьny)",
+    "type and case": "noun - jimenьnik: \"edьnota\" | nominative - jimenovьnik (koto? čьto?) | plural - munoga ličьba | type feminine (inanimate) - rodjajь ženьsky (neživotьny)",
     "context": "unities",
     "polish": "jednoty",
     "slovian": "edьnoty"
   },
   {
-    "type and case": "noun - jimenьnik: \"vědja\" | accusative - vinьnik (kogo? čьto?) | plural - munoga ličьba | type feminine (inanimate) - rodjajь ženьsky (neživotьny)",
+    "type and case": "noun - jimenьnik: \"edьnota\" | accusative - vinьnik (kogo? čьto?) | plural - munoga ličьba | type feminine (inanimate) - rodjajь ženьsky (neživotьny)",
     "context": "unities",
     "polish": "jednoty",
     "slovian": "edьnoty"
   },
   {
-    "type and case": "noun - jimenьnik: \"vědja\" | genitive - rodilьnik (kogo? čego?) | plural - munoga ličьba | type feminine (inanimate) - rodjajь ženьsky (neživotьny)",
+    "type and case": "noun - jimenьnik: \"edьnota\" | genitive - rodilьnik (kogo? čego?) | plural - munoga ličьba | type feminine (inanimate) - rodjajь ženьsky (neživotьny)",
     "context": "unities",
     "polish": "jednot",
     "slovian": "edьnot"
   },
   {
-    "type and case": "noun - jimenьnik: \"vědja\" | locative - městьnik (ob kom? ob čem? kude? vu? na? pri?) | plural - munoga ličьba | type feminine (inanimate) - rodjajь ženьsky (neživotьny)",
+    "type and case": "noun - jimenьnik: \"edьnota\" | locative - městьnik (ob kom? ob čem? kude? vu? na? pri?) | plural - munoga ličьba | type feminine (inanimate) - rodjajь ženьsky (neživotьny)",
     "context": "unities",
     "polish": "jednotach",
     "slovian": "edьnotah"
   },
   {
-    "type and case": "noun - jimenьnik: \"vědja\" | dative - měrьnik (komu? czemu?) | plural - munoga ličьba | type feminine (inanimate) - rodjajь ženьsky (neživotьny)",
+    "type and case": "noun - jimenьnik: \"edьnota\" | dative - měrьnik (komu? czemu?) | plural - munoga ličьba | type feminine (inanimate) - rodjajь ženьsky (neživotьny)",
     "context": "unities",
     "polish": "jednotom",
     "slovian": "edьnotam"
   },
   {
-    "type and case": "noun - jimenьnik: \"vědja\" | instrumental - orǫdьnik (su kymь? su čimь? su jakymь?) | plural - munoga ličьba | type feminine (inanimate) - rodjajь ženьsky (neživotьny)",
+    "type and case": "noun - jimenьnik: \"edьnota\" | instrumental - orǫdьnik (su kymь? su čimь? su jakymь?) | plural - munoga ličьba | type feminine (inanimate) - rodjajь ženьsky (neživotьny)",
     "context": "unities",
     "polish": "jednotami",
     "slovian": "edьnoty"
   },
   {
-    "type and case": "noun - jimenьnik: \"vědja\" | vocative - zovanьnik (o!) | plural - munoga ličьba | type feminine (inanimate) - rodjajь ženьsky (neživotьny)",
+    "type and case": "noun - jimenьnik: \"edьnota\" | vocative - zovanьnik (o!) | plural - munoga ličьba | type feminine (inanimate) - rodjajь ženьsky (neživotьny)",
     "context": "unities",
     "polish": "jednoty",
     "slovian": "edьnoty"
   },
   {
     "type and case": "noun - jimenьnik: \"tьpun\" | nominative - jimenovьnik (koto? čьto?) | singular - poedinьna ličьba | type masculine (animate) - rodjajь mǫžьsky (životьny)",
-    "context": "drug addict",
+    "context": "drug addict, alcoholic",
     "polish": "ćpun",
     "slovian": "tьpun"
   },
   {
     "type and case": "noun - jimenьnik: \"tьpun\" | accusative - vinьnik (kogo? čьto?) | singular - poedinьna ličьba | type masculine (animate) - rodjajь mǫžьsky (životьny)",
-    "context": "drug addict",
+    "context": "drug addict, alcoholic",
     "polish": "ćpuna",
     "slovian": "tьpuna"
   },
   {
     "type and case": "noun - jimenьnik: \"tьpun\" | genitive - rodilьnik (kogo? čego?) | singular - poedinьna ličьba | type masculine (animate) - rodjajь mǫžьsky (životьny)",
-    "context": "drug addict",
+    "context": "drug addict, alcoholic",
     "polish": "ćpuna",
     "slovian": "tьpuna"
   },
   {
     "type and case": "noun - jimenьnik: \"tьpun\" | locative - městьnik (ob kom? ob čem? kude? vu? na? pri?) | singular - poedinьna ličьba | type masculine (animate) - rodjajь mǫžьsky (životьny)",
-    "context": "drug addict",
+    "context": "drug addict, alcoholic",
     "polish": "ćpunie",
     "slovian": "tьpuně"
   },
   {
     "type and case": "noun - jimenьnik: \"tьpun\" | dative - měrьnik (komu? čemu?) | singular - poedinьna ličьba | type masculine (animate) - rodjajь mǫžьsky (životьny)",
-    "context": "drug addict",
+    "context": "drug addict, alcoholic",
     "polish": "ćpunowi",
     "slovian": "tьpunu"
   },
   {
     "type and case": "noun - jimenьnik: \"tьpun\" | instrumental - orǫdьnik (su kymь? su čimь? su jakymь?) | singular - poedinьna ličьba | type masculine (animate) - rodjajь mǫžьsky (životьny)",
-    "context": "drug addict",
+    "context": "drug addict, alcoholic",
     "polish": "ćpunem",
-    "slovian": "tьpunom"
+    "slovian": "tьpunomь"
   },
   {
     "type and case": "noun - jimenьnik: \"tьpun\" | vocative - zovanьnik (o!) | singular - poedinьna ličьba | type masculine (animate) - rodjajь mǫžьsky (životьny)",
-    "context": "drug addict",
+    "context": "drug addict, alcoholic",
     "polish": "ćpunie",
     "slovian": "tьpune"
   },
   {
     "type and case": "noun - jimenьnik: \"tьpun\" | nominative - jimenovьnik (koto? čьto?) | plural - munoga ličьba | type masculine (animate) - rodjajь mǫžьsky (životьny)",
-    "context": "drug addicts",
+    "context": "drug addict, alcoholic",
     "polish": "ćpuni",
     "slovian": "tьpuni"
   },
   {
     "type and case": "noun - jimenьnik: \"tьpun\" | accusative - vinьnik (kogo? čьto?) | plural - munoga ličьba | type masculine (animate) - rodjajь mǫžьsky (životьny)",
-    "context": "drug addicts",
+    "context": "drug addict, alcoholic",
     "polish": "ćpunów",
     "slovian": "tьpuny"
   },
   {
     "type and case": "noun - jimenьnik: \"tьpun\" | genitive - rodilьnik (kogo? čego?) | plural - munoga ličьba | type masculine (animate) - rodjajь mǫžьsky (životьny)",
-    "context": "drug addicts",
+    "context": "drug addict, alcoholic",
     "polish": "ćpunów",
     "slovian": "tьpun"
   },
   {
     "type and case": "noun - jimenьnik: \"tьpun\" | locative - městьnik (ob kom? ob čem? kude? vu? na? pri?) | plural - munoga ličьba | type masculine (animate) - rodjajь mǫžьsky (životьny)",
-    "context": "drug addicts",
+    "context": "drug addict, alcoholic",
     "polish": "ćpunach",
     "slovian": "tьpuněh"
   },
   {
     "type and case": "noun - jimenьnik: \"tьpun\" | dative - měrьnik (komu? čemu?) | plural - munoga ličьba | type masculine (animate) - rodjajь mǫžьsky (životьny)",
-    "context": "drug addicts",
+    "context": "drug addict, alcoholic",
     "polish": "ćpunom",
     "slovian": "tьpunom"
   },
   {
     "type and case": "noun - jimenьnik: \"tьpun\" | instrumental - orǫdьnik (su kymь? su čimь? su jakymь?) | plural - munoga ličьba | type masculine (animate) - rodjajь mǫžьsky (životьny)",
-    "context": "drug addicts",
+    "context": "drug addict, alcoholic",
     "polish": "ćpunami",
     "slovian": "tьpuny"
   },
   {
     "type and case": "noun - jimenьnik: \"tьpun\" | vocative - zovanьnik (o!) | plural - munoga ličьba | type masculine (animate) - rodjajь mǫžьsky (životьny)",
-    "context": "drug addicts",
+    "context": "drug addict, alcoholic",
     "polish": "ćpuni",
     "slovian": "tьpuni"
   },
