@@ -2,9 +2,8 @@ import streamlit as st
 import json
 import os
 import re
-import openai
+import google.generativeai as genai
 from dotenv import load_dotenv
-
 load_dotenv()
 
 # ============================================================
@@ -21,13 +20,10 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # ============================================================
-# 2. KLUCZ API I MODEL
+# 2. KLUCZ API GOOGLE
 # ============================================================
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-client = openai.OpenAI(
-    base_url="https://openrouter.ai/api/v1",
-    api_key=OPENROUTER_API_KEY
-)
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+genai.configure(api_key=GOOGLE_API_KEY)
 
 # ============================================================
 # 3. ŁADOWANIE BAZY DANYCH
@@ -43,11 +39,9 @@ def load_json_file(filename):
         st.error(f"Blǫd osnovy: {e}")
         return {}
 
-# Ładowanie obu plików
 data_osnova = load_json_file("osnova.json")
 vuzor_data = load_json_file("vuzor.json")
 
-# Indeksowanie słownika (osnova)
 dictionary = {}
 if isinstance(data_osnova, list):
     for entry in data_osnova:
@@ -91,10 +85,8 @@ if user_input:
             f"- POLSKIE: {m['polish']} | UŻYJ FORMY: {m['slovian']} | GRAMATYKA: {m.get('type and case','')}"
             for m in matches
         ])
-        
-        # Dodanie wzorców odmian do kontekstu AI, żeby nie halucynował
-        vuzor_context = json.dumps(vuzor_data, ensure_ascii=False)[:3000] 
-
+       
+        vuzor_context = json.dumps(vuzor_data, ensure_ascii=False)[:3000]
         system_prompt = f"""Jesteś rygorystycznym silnikiem tłumaczącym z języka polskiego na język prasłowiański.
 Twoim jedynym źródłem prawdy jest dostarczona BAZA WIEDZY (osnova.json).
 ### KRYTYCZNA ZASADA ORTOGRAFI I INNYCH JĘZYKOWYCH BŁĘDÓW:
@@ -197,20 +189,17 @@ KONKRETNE PRZYKŁADY MIEJSCOWNIKA:
 3. SYMBOLE: Zachowaj liczby, znaki matematyczne i linki bez zmian.
 4. WALIDACJA: Przed zwróceniem sprawdź, czy NIE UŻYŁEŚ cyrylicy (oprócz ь/Ь).
 Zwróć TYLKO czyste tłumaczenie używając alfabetu łacińskiego + ě, ę, ǫ, ь/Ь i nic więcej oraz zwracaj uwagę na wielkość liter, interpunktację i znaki matematyczne, aby były odwzorowane w tłumaczeniu i nie możesz halucynować, zmyślać czegoś, czego nie ma w plikach osnova.json i vuzor.json.
-
 ### WZORCE ODMIAN (vuzor.json):
 {vuzor_context}
 """
         try:
-            chat_completion = client.chat.completions.create(
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": f"BAZA:\n{context_str}\n\nDO TŁUMACZENIA: {user_input}"}
-                ],
-                model="arcee-ai/trinity-large-preview:free",
-                temperature=0.0
+            model = genai.GenerativeModel(
+                model_name="gemini-1.5-flash",
+                system_instruction=system_prompt,
+                generation_config=genai.GenerationConfig(temperature=0.0)
             )
-            response_text = chat_completion.choices[0].message.content.strip()
+            response = model.generate_content(f"BAZA:\n{context_str}\n\nDO TŁUMACZENIA: {user_input}")
+            response_text = response.text.strip()
             st.markdown("### Vynik perklada:")
             st.success(response_text)
             if matches:
@@ -218,5 +207,4 @@ Zwróć TYLKO czyste tłumaczenie używając alfabetu łacińskiego + ě, ę, ǫ
                     for m in matches:
                         st.write(f"**{m['polish']}** → `{m['slovian']}` ({m.get('type and case','')})")
         except Exception as e:
-            st.error(f"Blǫd umětьnogo uma: {e}")
-
+            st.error(f"Blǫd: {e}")
