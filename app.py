@@ -21,7 +21,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # ============================================================
-# 2. INICJALIZACJA ARGOS (BEZ LIMITÓW)
+# 2. INICJALIZACJA SILNIKA (LOKALNIE)
 # ============================================================
 @st.cache_resource
 def setup_translator():
@@ -37,7 +37,7 @@ def setup_translator():
 translator_ready = setup_translator()
 
 # ============================================================
-# 3. ŁADOWANIE BAZY DANYCH
+# 3. ŁADOWANIE TWOJEJ BAZY (OSNOVA I VUZOR)
 # ============================================================
 @st.cache_data
 def load_data():
@@ -48,7 +48,6 @@ def load_data():
     osnova = read_json("osnova.json")
     vuzor = read_json("vuzor.json")
     
-    # Indeksowanie dla szybkiego szukania
     dic = {}
     for entry in osnova:
         pl = entry.get("polish", "").lower().strip()
@@ -60,85 +59,87 @@ def load_data():
 dictionary, vuzor_data = load_data()
 
 # ============================================================
-# 4. FUNKCJE LOGICZNE (TWOJE ZASADY)
+# 4. LOGIKA WYMUSZAJĄCA TWOJE ZASADY (KOD ZAMIAST PROMPTU)
 # ============================================================
 
-def apply_case_format(original, translated):
-    """Zachowuje wielkość liter (Case-by-Case)"""
+def match_case(original, translated):
+    """Zasada Case-by-Case: Matka -> Mati, matka -> mati"""
     if original.isupper(): return translated.upper()
-    if original.istitle(): return translated.capitalize()
+    if original[0].isupper(): return translated.capitalize()
     return translated.lower()
 
-def fix_word_order(words_with_pos):
-    """ZASADA: Przymiotnik ZAWSZE przed rzeczownikiem"""
+def reorder_grammar(words_with_info):
+    """KRYTYCZNA ZASADA: Przymiotnik ZAWSZE przed rzeczownikiem"""
     result = []
     i = 0
-    while i < len(words_with_pos):
-        # Jeśli znajdziemy Rzeczownik, a po nim Przymiotnik (polska kolejność)
-        if i + 1 < len(words_with_pos):
-            w1, pos1 = words_with_pos[i]
-            w2, pos2 = words_with_pos[i+1]
+    while i < len(words_with_info):
+        # Sprawdzamy, czy mamy parę: Rzeczownik + Przymiotnik (polska kolejność)
+        if i + 1 < len(words_with_info):
+            w1, info1 = words_with_info[i]
+            w2, info2 = words_with_info[i+1]
             
-            if "noun" in pos1.lower() and "adj" in pos2.lower():
-                # Zamieniamy kolejność: Przymiotnik -> Rzeczownik
+            # Jeśli w1 to rzeczownik (noun), a w2 to przymiotnik (adj) -> zamień kolejność
+            if "noun" in info1.get('type', '') and "adj" in info2.get('type', ''):
                 result.append(w2)
                 result.append(w1)
                 i += 2
                 continue
-        result.append(words_with_pos[i][0])
+        
+        result.append(words_with_info[i][0])
         i += 1
     return result
 
-def translate_text(text):
-    # Czyszczenie i rozbicie na słowa
-    raw_words = text.split()
-    translated_sentence = []
-    matches_found = []
+def custom_translate(text):
+    # 1. Czyszczenie i rozbicie na słowa
+    words = text.split()
+    processed_sentence = []
+    found_in_base = []
 
-    for word in raw_words:
-        clean_word = re.sub(r'[^\w]', '', word).lower()
+    for word in words:
+        clean = re.sub(r'[^\w]', '', word).lower()
         
-        # 1. Szukaj w osnova.json
-        if clean_word in dictionary:
-            entry = dictionary[clean_word][0]
+        # 2. Szukanie w Twojej bazie (OSNOVA)
+        if clean in dictionary:
+            entry = dictionary[clean][0]
             slov_word = entry['slovian']
-            pos = entry.get('type and case', '')
+            # Zapamiętujemy typ słowa do późniejszej zmiany kolejności
+            word_type = entry.get('type and case', '').lower()
             
-            final_word = apply_case_format(word, slov_word)
-            translated_sentence.append((final_word, pos))
-            matches_found.append(entry)
+            final_word = match_case(word, slov_word)
+            processed_sentence.append((final_word, {'type': word_type}))
+            found_in_base.append(entry)
         else:
-            # 2. Fallback do Argos (jeśli brak w bazie)
+            # 3. Fallback do Argos (jeśli brak w bazie)
             try:
-                argos_res = argostranslate.translate.translate(word, 'pl', 'en')
-                translated_sentence.append((apply_case_format(word, argos_res), "unknown"))
+                translated = argostranslate.translate.translate(word, 'pl', 'en')
+                processed_sentence.append((match_case(word, translated), {'type': 'unknown'}))
             except:
-                translated_sentence.append((word, "unknown"))
+                processed_sentence.append((word, {'type': 'unknown'}))
 
-    # 3. Zastosuj zmianę kolejności (Przymiotnik przed Rzeczownik)
-    ordered_words = fix_word_order(translated_sentence)
+    # 4. WYMUSZENIE KOLEJNOŚCI: Przymiotnik przed Rzeczownik
+    final_ordered_words = reorder_grammar(processed_sentence)
     
-    return " ".join(ordered_words), matches_found
+    return " ".join(final_ordered_words), found_in_base
 
 # ============================================================
-# 5. INTERFEJS
+# 5. INTERFEJS UŻYTKOWNIKA
 # ============================================================
 st.title("Perkladačь slověnьskogo ęzyka")
-st.caption("Działanie lokalne (Argos) z Twoją bazą JSON")
+st.caption("Działanie lokalne (Argos + Logika Gramatyczna) - Bez Limitów")
 
 user_input = st.text_input("Vupiši rěčenьje:", placeholder="np. Wojsko Słowiańskie")
 
 if user_input:
     if not translator_ready:
-        st.warning("Inicjalizacja silnika...")
+        st.info("Inicjalizacja silnika...")
     else:
-        with st.spinner("Przekładanie..."):
-            result, matches = translate_text(user_input)
+        with st.spinner("Przetwarzanie zasad gramatyki..."):
+            result, matches = custom_translate(user_input)
             
             st.markdown("### Vynik perklada:")
             st.success(result)
             
             if matches:
-                with st.expander("Užito jiz osnovy (RAG)"):
+                with st.expander("Užito jiz Twojej podstawy (RAG)"):
                     for m in matches:
-                        st.write(f"**{m['polish']}** → `{m['slovian']}`")
+                        st.write(f"**{m['polish']}** → `{m['slovian']}` ({m.get('type and case','')})")
