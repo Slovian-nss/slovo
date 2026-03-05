@@ -2,9 +2,15 @@ import streamlit as st
 import json
 import os
 import re
+import argostranslate.package
+import argostranslate.translate
 from dotenv import load_dotenv
+
 load_dotenv()
 
+# ============================================================
+# 1. KONFIGURACJA I STYLIZACJA
+# ============================================================
 st.set_page_config(page_title="Perkladačь slověnьskogo ęzyka", layout="centered")
 st.markdown("""
     <style>
@@ -14,70 +20,126 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
+# ============================================================
+# 2. INICJALIZACJA SILNIKA (LOKALNIE)
+# ============================================================
+@st.cache_resource
+def setup_translator():
+    try:
+        argostranslate.package.update_package_index()
+        available_packages = argostranslate.package.get_available_packages()
+        package_to_install = next(filter(lambda x: x.from_code == 'pl' and x.to_code == 'en', available_packages), None)
+        if package_to_install:
+            argostranslate.package.install_from_path(package_to_install.download())
+        return True
+    except: return False
+
+translator_ready = setup_translator()
+
+# ============================================================
+# 3. ŁADOWANIE TWOJEJ BAZY (OSNOVA I VUZOR)
+# ============================================================
 @st.cache_data
 def load_data():
     def read_json(fn):
         if not os.path.exists(fn): return []
         with open(fn, "r", encoding="utf-8") as f: return json.load(f)
+    
     osnova = read_json("osnova.json")
     vuzor = read_json("vuzor.json")
+    
     dic = {}
     for entry in osnova:
         pl = entry.get("polish", "").lower().strip()
-        if pl: dic.setdefault(pl, []).append(entry)
+        if pl:
+            if pl not in dic: dic[pl] = []
+            dic[pl].append(entry)
     return dic, vuzor
 
 dictionary, vuzor_data = load_data()
 
-def match_case(original, translated):
-    if not translated: return original
-    result = []
-    t_idx = 0
-    for o in original:
-        if o.isalpha() and t_idx < len(translated):
-            result.append(translated[t_idx].upper() if o.isupper() else translated[t_idx].lower())
-            t_idx += 1
-        else:
-            result.append(o)
-    return ''.join(result)
+# ============================================================
+# 4. LOGIKA WYMUSZAJĄCA TWOJE ZASADY (KOD ZAMIAST PROMPTU)
+# ============================================================
 
-def get_declined_form(token, base_entry, vuzor):
-    clean = re.sub(r'[^\w]', '', token).lower()
-    for entry in vuzor:
-        if entry.get("polish", "").lower() == clean and "slovian" in entry:
-            return entry["slovian"]
-    return base_entry.get("slovian", "") if base_entry else ""
+def match_case(original, translated):
+    """Zasada Case-by-Case: Matka -> Mati, matka -> mati"""
+    if original.isupper(): return translated.upper()
+    if original[0].isupper(): return translated.capitalize()
+    return translated.lower()
+
+def reorder_grammar(words_with_info):
+    """KRYTYCZNA ZASADA: Przymiotnik ZAWSZE przed rzeczownikiem"""
+    result = []
+    i = 0
+    while i < len(words_with_info):
+        # Sprawdzamy, czy mamy parę: Rzeczownik + Przymiotnik (polska kolejność)
+        if i + 1 < len(words_with_info):
+            w1, info1 = words_with_info[i]
+            w2, info2 = words_with_info[i+1]
+            
+            # Jeśli w1 to rzeczownik (noun), a w2 to przymiotnik (adj) -> zamień kolejność
+            if "noun" in info1.get('type', '') and "adj" in info2.get('type', ''):
+                result.append(w2)
+                result.append(w1)
+                i += 2
+                continue
+        
+        result.append(words_with_info[i][0])
+        i += 1
+    return result
 
 def custom_translate(text):
-    tokens = re.findall(r'\w+|[^\w\s]', text)
-    processed = []
-    found = []
-    for token in tokens:
-        if not re.match(r'^\w', token):
-            processed.append((token, {'type': 'punct'}))
-            continue
-        clean = re.sub(r'[^\w]', '', token).lower()
+    # 1. Czyszczenie i rozbicie na słowa
+    words = text.split()
+    processed_sentence = []
+    found_in_base = []
+
+    for word in words:
+        clean = re.sub(r'[^\w]', '', word).lower()
+        
+        # 2. Szukanie w Twojej bazie (OSNOVA)
         if clean in dictionary:
             entry = dictionary[clean][0]
-            slov = get_declined_form(token, entry, vuzor_data) or entry.get('slovian', '')
-            typ = entry.get('type and case', '').lower()
-            final = match_case(token, slov)
-            processed.append((final, {'type': typ}))
-            found.append(entry)
+            slov_word = entry['slovian']
+            # Zapamiętujemy typ słowa do późniejszej zmiany kolejności
+            word_type = entry.get('type and case', '').lower()
+            
+            final_word = match_case(word, slov_word)
+            processed_sentence.append((final_word, {'type': word_type}))
+            found_in_base.append(entry)
         else:
-            final = match_case(token, "(ne najdeno slova)")
-            processed.append((final, {'type': 'unknown'}))
-    return " ".join(w[0] for w in processed), found
+            # 3. Fallback do Argos (jeśli brak w bazie)
+            try:
+                translated = argostranslate.translate.translate(word, 'pl', 'en')
+                processed_sentence.append((match_case(word, translated), {'type': 'unknown'}))
+            except:
+                processed_sentence.append((word, {'type': 'unknown'}))
 
+    # 4. WYMUSZENIE KOLEJNOŚCI: Przymiotnik przed Rzeczownik
+    final_ordered_words = reorder_grammar(processed_sentence)
+    
+    return " ".join(final_ordered_words), found_in_base
+
+# ============================================================
+# 5. INTERFEJS UŻYTKOWNIKA
+# ============================================================
 st.title("Perkladačь slověnьskogo ęzyka")
-st.caption("Tylko baza + vuzor (odmiany)")
-user_input = st.text_input("Vupiši rěčenьje:", placeholder="np. Bez jasnego planu nas nie będzie.")
+st.caption("Działanie lokalne (Argos + Logika Gramatyczna) - Bez Limitów")
+
+user_input = st.text_input("Vupiši rěčenьje:", placeholder="np. Wojsko Słowiańskie")
+
 if user_input:
-    with st.spinner("Przetwarzanie według vuzor..."):
-        result, matches = custom_translate(user_input)
-        st.markdown("### Vynik perklada:")
-        st.success(result)
-        if matches:
-            with st.expander("Užito jiz Twojej podstawy"):
-                for m in matches:
-                    st.write(f"**{m.get('polish','')}** → `{m.get('slovian','')}` ({m.get('type and case','')})")
+    if not translator_ready:
+        st.info("Inicjalizacja silnika...")
+    else:
+        with st.spinner("Przetwarzanie zasad gramatyki..."):
+            result, matches = custom_translate(user_input)
+            
+            st.markdown("### Vynik perklada:")
+            st.success(result)
+            
+            if matches:
+                with st.expander("Užito jiz Twojej podstawy (RAG)"):
+                    for m in matches:
+                        st.write(f"**{m['polish']}** → `{m['slovian']}` ({m.get('type and case','')})")
