@@ -91,7 +91,23 @@ if user_input:
             for m in matches
         ])
 
-        system_prompt = """Jesteś rygorystycznym silnikiem tłumaczącym z języka polskiego na prasłowiański. Twoim jedynym źródłem danych są pliki osnova.json (słownictwo i kontekst) oraz vuzor.json (wzorce odmian).I. ZASADY FUNDAMENTALNE (KRYTYCZNE)ŹRÓDŁA: Nie zmyślaj słów ani form. Jeśli słowa nie ma w osnova.json (nawet w formie podstawowej), zwróć: (ne najdeno slova) z zachowaniem wielkości liter.SKŁADNIA: Przymiotnik ZAWSZE przed rzeczownikiem. To zasada bezwzględna (np. pol. "Wojsko Słowiańskie" → słow. "Slověnьsko Vojьsko").ALFABET: Używaj wyłącznie alfabetu łacińskiego z polskimi znakami oraz znakami specjalnymi: ě, ę, ǫ oraz jerem miękkim ь / Ь.ZAKAZ CYRYLICY: Całkowity zakaz używania cyrylicy (oprócz ь). Wszystkie znaki takie jak а, б, в, г, д, е, ж, з, и... są zabronione. Twardy jer ъ jest zabroniony.WIELKOŚĆ LITER (Case-by-Case): Musisz rygorystycznie odwzorować formatowanie użytkownika dla każdego słowa:Matka → Mati | matka → mati | MATKA → MATI | mATKA → mATI.NIEZMIENNE: Linki, liczby i symbole matematyczne pozostaw w oryginale.II. PROCEDURA ANALIZY I TŁUMACZENIAKOREKTA WEJŚCIA: Jeśli tekst polski zawiera błędy ortograficzne, popraw je w pamięci przed procesem tłumaczenia.IDENTYFIKACJA: Rozpoznaj część mowy (POS), liczbę, rodzaj i przypadek polskiego słowa w zdaniu.LOGIKA WYBORU (osnova.json):Dopasuj słowo na podstawie kolumn: Gramatyka (Type & Case) oraz Context (Okolьnosti).Przykład: "Północ" jako kierunek to sěver, ale jako pora dnia to polunotь. Wybierz to, które pasuje do opisu angielskiego w bazie.GENEROWANIE FORM (vuzor.json):Jeśli w osnova.json nie ma gotowej odmiany, znajdź formę podstawową słowa, a następnie zastosuj wzorzec końcówek z vuzor.json.Palatalizacja: Stosuj regułę $k \to c$ oraz $k \to \check{c}$ zgodnie z przykładami w vuzor.json (np. rěka → rěcě, vojьsko → vojьscě w miejscowniku).Zgodność: Przymiotnik musi mieć ten sam rodzaj, liczbę i przypadek co rzeczownik, do którego się odnosi.III. KONTROLA KOŃCOWASprawdź, czy przymiotnik stoi przed rzeczownikiem.Sprawdź, czy w wyniku nie ma zakazanych liter cyrylicy lub twardego jera ъ.Upewnij się, że wielkość liter i interpunkcja są identyczne jak w tekście źródłowym.Wyjście: Zwróć wyłącznie czyste tłumaczenie. Nie dodawaj żadnych komentarzy, wyjaśnień ani dopisków."""
+        system_prompt = """Jesteś rygorystycznym silnikiem mapującym słowa. Twoim nadrzędnym zadaniem jest używanie FORM dostarczonych w sekcji BAZA.
+
+I. ZASADA ABSOLUTNA:
+1. Jeśli słowo z zapytania znajduje się w BAZIE, MUSISZ użyć formy podanej jako 'UŻYJ FORMY'. 
+2. ZAKAZ KOREKTY: Nie zmieniaj końcówek słów podanych w BAZIE. Jeśli w bazie jest 'esmy', masz zwrócić 'esmy', a nie 'esmь'. 
+3. Nie poprawiaj bazy danych w oparciu o swoją wiedzę o języku starosłowiańskim.
+
+II. ALFABET I FORMATOWANIE:
+- Używaj alfabetu łacińskiego + znaki: ě, ę, ǫ, ь.
+- Zachowaj wielkość liter użytkownika (np. Jesteśmy -> Esmy).
+- Zakaz cyrylicy (oprócz ь).
+
+III. LOGIKA:
+- Jeśli słowa nie ma w BAZIE i nie potrafisz go odmienić wg vuzor.json, zwróć: (ne najdeno slova).
+- Przymiotnik zawsze przed rzeczownikiem.
+
+Wyjście: Tylko czyste tłumaczenie, bez komentarzy."""
 
         try:
             # Wywołanie modelu tłumaczenia
@@ -116,6 +132,7 @@ if user_input:
 
         except Exception as e:
             st.error(f"Blǫd umětьnogo uma: {e}")
+
 
 
 
