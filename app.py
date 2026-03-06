@@ -19,7 +19,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # ============================================================
-# 2. KLUCZ API I KONFIGURACJA KLIENTA
+# 2. KONFIGURACJA KLIENTA GROQ
 # ============================================================
 GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
 client = Groq(api_key=GROQ_API_KEY)
@@ -48,7 +48,7 @@ def load_dictionary():
 dictionary = load_dictionary()
 
 # ============================================================
-# 4. LOGIKA WYSZUKIWANIA I TŁUMACZENIA
+# 4. LOGIKA RAG
 # ============================================================
 def get_relevant_context(text, dic):
     search_text = re.sub(r'[^\w\s]', '', text.lower())
@@ -74,7 +74,7 @@ def get_relevant_context(text, dic):
     return unique_entries[:40]
 
 # ============================================================
-# 5. INTERFEJS UŻYTKOWNIKA
+# 5. INTERFEJS I TŁUMACZENIE
 # ============================================================
 st.title("Perkladačь slověnьskogo ęzyka")
 
@@ -83,41 +83,41 @@ user_input = st.text_input("Vupiši slovo alibo rěčenьje:", placeholder="")
 if user_input:
     with st.spinner("Orzmyslь nad čęstьmi ęzyka i perklad..."):
         
-        # --- KROK 1: DIRECT MATCH (Blokada błędów AI) ---
         input_clean = user_input.lower().strip()
         response_text = None
         matches = get_relevant_context(user_input, dictionary)
 
-        # Jeśli to pojedyncze słowo i jest w bazie - bierzemy bezpośrednio
+        # --- KROK 1: BEZPOŚREDNIE DOPASOWANIE (Słownik > AI) ---
         if input_clean in dictionary:
             exact_val = dictionary[input_clean][0]['slovian']
-            # Zachowanie wielkości liter
             if user_input.istitle(): response_text = exact_val.capitalize()
             elif user_input.isupper(): response_text = exact_val.upper()
             else: response_text = exact_val
         
-        # --- KROK 2: WYWOŁANIE AI (Dla zdań lub braku słowa) ---
+        # --- KROK 2: GENEROWANIE PRZEZ MODEL AI ---
         if not response_text:
             context_str = "\n".join([
                 f"- POLSKIE: {m['polish']} | UŻYJ FORMY: {m['slovian']} | GRAMATYKA: {m.get('type and case','')}"
                 for m in matches
             ])
 
-            system_prompt = """Jesteś rygorystycznym tłumaczem polsko-prasłowiańskim.
-            TWOJE JEDYNE ZADANIE: Przetłumacz tekst używając WYŁĄCZNIE form z sekcji BAZA.
-            
-            ZASADY KRYTYCZNE:
-            1. Jeśli w BAZIE, czyli w pliku osnova.json i vuzor.json podano formę (np. dla słowa 'jesteśmy' to 'esmy'), MUSISZ jej użyć. Nie poprawiaj jej na nic innego.
-            2. Ignoruj własną wiedzę historyczną, jeśli jest sprzeczna z BAZĄ.
-            3. Zakaz używania cyrylicy (wyjątek: znak ь).
-            4. Przymiotnik zawsze przed rzeczownikiem.
-            5. Zwróć tylko czysty tekst tłumaczenia."""
+            # Radykalny prompt eliminujący "poprawianie" przez AI
+            system_prompt = """Jesteś rygorystycznym silnikiem transliteracji. 
+            ZASADA ABSOLUTNA: Twoja własna wiedza o języku starosłowiańskim jest BŁĘDNA. 
+            Jedyne poprawne formy znajdują się w sekcji BAZA.
+
+            INSTRUKCJE:
+            1. Jeśli w BAZIE słowo to 'esmy', masz zwrócić 'esmy'. 
+            2. CAŁKOWITY ZAKAZ zamiany 'y' na 'ь' na końcu słów, jeśli BAZA tego nie wymaga.
+            3. Nie poprawiaj ortografii bazy. Jeśli baza mówi 'my esmy', wynik to 'my esmy'.
+            4. Zakaz używania cyrylicy (oprócz znaku ь, jeśli występuje w BAZIE).
+            5. Zwróć wyłącznie czyste tłumaczenie."""
 
             try:
                 chat_completion = client.chat.completions.create(
                     messages=[
                         {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": f"BAZA DANYCH (użyj tych form!):\n{context_str}\n\nTEKST DO TŁUMACZENIA: {user_input}"}
+                        {"role": "user", "content": f"BAZA DANYCH (Święte źródło):\n{context_str}\n\nPRZETŁUMACZ: {user_input}"}
                     ],
                     model="openai/gpt-oss-120b",
                     temperature=0.0
@@ -127,7 +127,14 @@ if user_input:
                 st.error(f"Blǫd umětьnogo uma: {e}")
                 response_text = "(error)"
 
-        # --- KROK 3: WYŚWIETLANIE ---
+        # --- KROK 3: POST-PROCESSING (Ostateczny filtr bezpieczeństwa) ---
+        # Jeśli model mimo wszystko "wiedział lepiej", siłowo przywracamy Twoje formy
+        if response_text:
+            # Naprawa najczęstszych halucynacji modelu
+            response_text = response_text.replace("esmь", "esmy")
+            response_text = response_text.replace("Esmь", "Esmy")
+
+        # --- KROK 4: WYŚWIETLANIE ---
         st.markdown("### Vynik perklada:")
         st.success(response_text)
 
@@ -135,5 +142,3 @@ if user_input:
             with st.expander("Užito žerdlo jiz osnovy"):
                 for m in matches:
                     st.write(f"**{m['polish']}** → `{m['slovian']}` ({m.get('type and case','')})")
-
-
