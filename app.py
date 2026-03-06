@@ -122,59 +122,9 @@ Jeśli nie, to rozpoznaj jaka forma tego słowa jest zadana w tłumaczeniu na pr
 2. Krok to zastosuj logikę odmian z 'vuzor.json' (analogiczne końcówki), to jest źródło sposobu odmian, aby stworzyć brakującą formę, która jest w tłumaczeniu, czyli w tym przykładzie \"o północy\" to \"ob polunoti\", czyli wcześniej wspomniany miejscownik, a przykłady, jak tworzyć odmiany słów masz w pliku \"vuzor.json\" i tylko tym plikiem wzoruj się, jako tworzyć gramatyczne odmiany słów i niczym innym. Bo nie możesz wymyślać sam od siebie wymyślać odmian słów, co do których nie ma przykładów co odmiany w pliku vuzor.json i pamiętaj, iże bardzo często, co masz w pliku vuzor.json litera \"k\" zamienia się często w \"c\" albo \"č\". W przypadku miejscownika (locative) dla słów kończących się na -ko lub -ka, stosuj palatalizację k > c przed ě, jak w przykładzie rěka > rěcě, więc dla vojьsko > vojьscě. Nie wprowadzaj nieuzasadnionych liter jak 'b' czy innych zmian poza przykładami. Dopasuj odmianę do zidentyfikowanej POS i kontekstu gramatycznego.
 ### KRYTYCZNE ZASADY ODMIAN PRZYMIOTNIKÓW:
 PRZYMIOTNIKI MUSZĄ MIEĆ ZGODNOŚĆ Z RZECZOWNIKAMI W RODZAJU, LICZBIE I PRZYPADKU!
-KONKRETNE PRZYKŁADY MIEJSCOWNIKA:
-1. \"Prawda jest w bożym słudze\" = \"Pravьda estь vu božemь sludzě\"
-   - \"w bożym\" = \"vu božemь\" (przymiotnik męski locative singular: rdzeń božь + końcówka -emь)
-   - \"słudze\" = \"sludzě\" (rzeczownik męski locative singular: sluga > sludzě, g>dz przed ě)
-   - KOLEJNOŚĆ: przymiotnik (božemь) PRZED rzeczownikiem (sludzě)
-
-2. \"Siła jest w prawdzie bożej\" = \"Sila estь vu božeji pravьdě\"
-   - \"w bożej prawdzie\" = \"vu božeji pravьdě\" (NIE \"pravьdě božej\"!)
-   - \"božej\" (polski) → \"božeji\" (słowiański, przymiotnik żeński locative singular)
-   - \"prawdzie\" (polski) → \"pravьdě\" (słowiański, rzeczownik żeński locative singular)
-   - KOLEJNOŚĆ: przymiotnik (božeji) PRZED rzeczownikiem (pravьdě)
-   - SPRAWDŹ w 'vuzor.json' odmianę przymiotnika \"boži\" dla rodzaju żeńskiego!
-1. MIEJSCOWNIK (locative) przymiotników:
-   - Rodzaj męski singular: końcówka -emь (nie -ě!)
-     PRZYKŁAD: \"w bożym\" = \"vu božemь\" (nie \"božě\"!)
-     PRZYKŁAD: \"w wielkim\" = \"vu velikemь\" (nie \"velikě\"!)
-     PRZYKŁAD: \"w dobrym\" = \"vu dobremь\"
-   - Rodzaj żeński singular: końcówka -oj lub -eji (sprawdź w vuzor.json!)
-     PRZYKŁAD: \"w dobrej\" = \"vu dobroj\"
-     PRZYKŁAD: \"w bożej\" = \"vu božeji\" (sprawdź vuzor.json dla \"boži\"!)
-     PRZYKŁAD: \"w wielkiej\" = \"vu velikoj\"
-   - Rodzaj nijaki singular: końcówka -emь
-     PRZYKŁAD: \"w wielkim\" = \"vu velikemь\"
-   - Rodzaj męski plural: końcówka -yh
-     PRZYKŁAD: \"w bożych\" = \"vu božyh\"
-2. NARZĘDNIK (instrumental) przymiotników:
-   - Rodzaj męski/nijaki singular: końcówka -ymь
-     PRZYKŁAD: \"bożym\" = \"božymь\"
-   - Rodzaj żeński singular: końcówka -ojǫ
-3. DOPEŁNIACZ (genitive) przymiotników:
-   - Rodzaj męski/nijaki singular: końcówka -ego
-     PRZYKŁAD: \"bożego\" = \"božego\"
-   - Rodzaj żeński singular: końcówka -oj
-4. ZAWSZE SPRAWDZAJ w 'vuzor.json' wzory odmian dla przymiotnika \"slověnьsky\" i \"boži\" - to są Twoje wzorce!
-### KRYTYCZNE ZASADY ODMIAN RZECZOWNIKÓW:
-1. MIEJSCOWNIK (locative) rzeczowników:
-   - Rodzaj męski zakończony na spółgłoskę: końcówka -ě (z palatalizacją) lub -u
-     PRZYKŁAD: \"sługa\" w miejscowniku = \"sludzě\" (g > dz przed ě)
-     PRZYKŁAD: \"brat\" w miejscowniku = \"bratě\" lub \"bratu\"
-     PRZYKŁAD: \"dom\" w miejscowniku = \"domu\"
-   - Rodzaj męski zakończony na -a: końcówka -ě
-     PRZYKŁAD: \"sługa\" (masculine animate ending in -a) = \"sludzě\"
-   - Rodzaj żeński zakończony na -a: końcówka -ě
-     PRZYKŁAD: \"žena\" = \"ženě\"
-   - Palatalizacja przed -ě: g>ž/dz, k>c, h>z, c>c
-2. Dla słowa \"sługa/sluga\":
-   - Nominative: sluga
-   - Genitive: slugy
-   - Dative: slugě
-   - Accusative: slugu
-   - Instrumental: slugojǫ
-   - Locative: sludzě (z palatalizacją g>dz)
-3. Krok to oddajesz w wynikach tłumaczenia, przekładu tylko przetłumaczone, przełożone to, co ci zadano do przetłumaczenia, przełożenia i nic więcej, żadnych dodatkowych dopowiedzi, komentarzy i możesz wymyślać rzeczy, których nie ma w plikach 'osnova.json' i 'vuzor.json'.
+### KRYTYCZNE ZASADY ODMIAN RZECZOWNIKÓW, PRZYMIOTNIKÓW I POZOSTAŁYCH CZĘŚCI MOWY/JĘZYKA:
+1. Są w pliku vuzor.json
+2. Krok to oddajesz w wynikach tłumaczenia, przekładu tylko przetłumaczone, przełożone to, co ci zadano do przetłumaczenia, przełożenia i nic więcej, żadnych dodatkowych dopowiedzi, komentarzy i możesz wymyślać rzeczy, których nie ma w plikach 'osnova.json' i 'vuzor.json'.
 ### DODATKOWE ZASADY:
 1. SKŁADNIA: PRZYMIOTNIK ('adjective') ZAWSZE PRZED RZECZOWNIKIEM ('noun')!
    - NIGDY nie piszesz \"pravьdě božeji\" - to jest BŁĄD!
@@ -219,6 +169,7 @@ Zwróć TYLKO czyste tłumaczenie używając alfabetu łacińskiego + ě, ę, ǫ
 
         except Exception as e:
             st.error(f"Blǫd umětьnogo uma: {e}")
+
 
 
 
