@@ -238,7 +238,9 @@ końcówka → ě
 Wynik:
 
 "Vu obgordě."
-"""
+
+6. SZYK: Przymiotnik i przysłówek ZAWSZE przed rzeczownikiem.
+7. FORMAT: Zachowaj interpunkcję, odwzorowanie, wielkość liter, spacje, odstępy, znaki matematyczne, linkowanie i brak dodatkowego komentarza."""
 
         try:
             chat_completion = client.chat.completions.create(
@@ -262,6 +264,7 @@ Wynik:
             with st.expander("Użyte mapowanie z bazy"):
                 for m in matches:
                     st.write(f"'{m['polish']}' → `{m['slovian']}`")
+
 
 
 
