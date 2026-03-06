@@ -230,10 +230,15 @@ Wejście:
 
 Analiza:
 
-w → vu  
-ogród → obgord  
-przypadek → loc singular  
-końcówka → ě  
+w → vu, czyli locative - městьnik słowa = ogród → obgord, a w pliku osnova.json jest on oznaczony jako:
+
+noun - jimenьnik: "obgord" | nominative - jimenovьnik (koto? čьto?) | singular - poedinьna ličьba | type masculine (inanimate) - rodjajь mǫžьsky (neživotьny)	garden	ogród	obgord
+
+Zaś w pliku vuzor.json jest słowo gramatycznie podobne, ale o innym znaczeniu:
+
+noun - jimenьnik: "gord" | nominative - jimenovьnik (koto? čьto?) | singular - poedinьna ličьba | type masculine (inanimate) - rodjajь mǫžьsky (neživotьny)	city, town, fortress	gród	gord
+
+I jego przypadek → "locative - městьnik (ob kom? ob čem? kude? vu? na? pri?) | singular - poedinьna ličьba | type masculine (inanimate) - rodjajь mǫžьsky (neživotьny)" ma końcówka → ě  po analizie w pliku 
 
 Wynik:
 
@@ -264,6 +269,7 @@ Wynik:
             with st.expander("Użyte mapowanie z bazy"):
                 for m in matches:
                     st.write(f"'{m['polish']}' → `{m['slovian']}`")
+
 
 
 
