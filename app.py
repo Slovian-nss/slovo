@@ -88,7 +88,7 @@ if user_input:
             for m in matches
         ])
 
-        system_prompt = """Jesteś procesorem tekstu działającym w trybie 'Search and Replace'. 
+        system_prompt = """Jesteś tłumaczem słowiańskiego (prasłowiańskiego) języka i działającym w trybie 'Search and Replace', a twoje jedyne źródła wiedzy o tym języku to pliki 'osnova.json' i 'vuzor.json'. 
 
 ZADANIE:
 Zastąp polskie słowa ich odpowiednikami z listy MAPOWANIA, zachowując nienaruszony format źródłowy.
@@ -126,5 +126,6 @@ RYGORYSTYCZNE ZASADY:
             with st.expander("Użyte mapowanie z bazy"):
                 for m in matches:
                     st.write(f"'{m['polish']}' → `{m['slovian']}`")
+
 
 
