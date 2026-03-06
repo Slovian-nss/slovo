@@ -12,7 +12,6 @@ st.set_page_config(page_title="Perkladačь slověnьskogo ęzyka", layout="cent
 st.markdown("""
     <style>
     .main { background-color: #0e1117; }
-    .stTextInput > div > div > input { background-color: #1a1a1a; color: #dcdcdc; border: 1px solid #333; }
     .stTextArea > div > div > textarea { background-color: #1a1a1a; color: #dcdcdc; border: 1px solid #333; }
     .stSuccess { background-color: #050505; border: 1px solid #2e7d32; color: #dcdcdc; font-size: 1.2rem; white-space: pre-wrap; }
     </style>
@@ -21,6 +20,7 @@ st.markdown("""
 # ============================================================
 # 2. KONFIGURACJA KLIENTA GROQ
 # ============================================================
+# Upewnij się, że masz klucz API w Secrets
 GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
 client = Groq(api_key=GROQ_API_KEY)
 
@@ -48,18 +48,30 @@ def load_dictionary():
 dictionary = load_dictionary()
 
 # ============================================================
-# 4. PRECYZYJNA LOGIKA POBIERANIA KONTEKSTU (Słowa + Frazy)
+# 4. USPRAWNIONA LOGIKA POBIERANIA KONTEKSTU (Fuzzy Matching)
 # ============================================================
 def get_strict_context(text, dic):
-    # Wyciągamy słowa, ignorując interpunkcję dla wyszukiwania
     search_text = re.sub(r'[^\w\s]', ' ', text.lower())
     words = search_text.split()
     relevant_entries = []
     
+    all_polish_bases = dic.keys()
+
     for word in words:
+        # 1. Szukamy dokładnego dopasowania (dla krótkich słów jak "w", "i")
         if word in dic:
             relevant_entries.extend(dic[word])
+            continue
+            
+        # 2. Szukamy dopasowania rdzenia (Lematyzacja "na piechotę")
+        # Jeśli słowo "miastach" zaczyna się tak samo jak "miasto" (pierwsze 4 litery)
+        if len(word) >= 4:
+            prefix = word[:4]
+            for base in all_polish_bases:
+                if base.startswith(prefix):
+                    relevant_entries.extend(dic[base])
     
+    # Deduplikacja wyników
     seen = set()
     unique_entries = []
     for e in relevant_entries:
@@ -75,151 +87,53 @@ def get_strict_context(text, dic):
 # ============================================================
 st.title("Perkladačь slověnьskogo ęzyka")
 
-# Używamy text_area zamiast text_input dla obsługi wielu linii
-user_input = st.text_area("Vupiši slovo alibo rěčenьje:", placeholder="", height=200)
+user_input = st.text_area("Vupiši slovo alibo rěčenьje:", placeholder="Np. W miastach siła.", height=150)
 
 if user_input:
-    with st.spinner("Przetwarzanie tekstu..."):
+    with st.spinner("Przetwarzanie..."):
         matches = get_strict_context(user_input, dictionary)
         
-        # Przygotowanie bardzo technicznej instrukcji mapowania
         mapping_rules = "\n".join([
-            f"MAPUJ: '{m['polish']}' NA '{m['slovian']}'"
+            f"POLSKI_LEMAT: '{m['polish']}' -> SŁOWIAŃSKI_RDZEŃ: '{m['slovian']}'"
             for m in matches
         ])
 
-        system_prompt = """
-Jesteś deterministycznym parserem i generatorem fleksji
-rekonstruowanego języka słowiańskiego.
-
-Twoim jedynym zadaniem jest zamiana polskich form słów
-na ich słowiańskie odpowiedniki fleksyjne
-na podstawie danych z:
-
-- osnova.json
-- vuzor.json
-
-Nie jesteś tłumaczem.
-Nie interpretujesz znaczeń.
-Nie tworzysz nowych form.
+        system_prompt = f"""
+Jesteś deterministycznym parserem języka słowiańskiego. 
+Twoim zadaniem jest przekształcenie polskiego zdania na język słowiański, używając dostarczonych rdzeni.
 
 --------------------------------------------------
-ZASADA GŁÓWNA
---------------------------------------------------
-
-Forma słowa powstaje według schematu:
-
-RDZEŃ (osnova.json) + KOŃCÓWKA (vuzor.json)
-
-Końcówki z vuzor.json są jedynym źródłem fleksji.
+ZASADY DZIAŁANIA:
+1. Przeanalizuj polskie słowo (np. "miastach" -> miejscownik, l.mnoga, rodzaj nijaki, lemat: "miasto").
+2. Znajdź odpowiedni SŁOWIAŃSKI_RDZEŃ dla tego lematu w dostarczonej liście.
+3. Dobierz końcówkę fleksyjną ze swojej bazy wiedzy (vuzor.json), pasującą do przypadku, liczby i rodzaju.
+4. Połącz: RDZEŃ + KOŃCÓWKA.
 
 --------------------------------------------------
-STRUKTURA DANYCH
---------------------------------------------------
-
-osnova.json
+DANE MAPOWANIA (OSNOVA):
+{mapping_rules}
 
 --------------------------------------------------
-
-Źródło wzorów/przykładów tworzenia gramatyczncyh odmian to plik vuzor.json
-
---------------------------------------------------
-TOKENIZACJA
---------------------------------------------------
-
-Podziel tekst na tokeny:
-
-- słowa
-- liczby
-- interpunkcję
-
---------------------------------------------------
-ROZPOZNAWANIE PRZYPADKU Z POLSKIEJ FORMY
---------------------------------------------------
---------------------------------------------------
-ALGORYTM DZIAŁANIA (KROK PO KROKU)
---------------------------------------------------
-Dla każdego tokenu (słowa):
-
-1. ANALIZA POLSKA: Określ formę gramatyczną polskiego słowa (Lemat, Przypadek, Liczba, Rodzaj). 
-   Przykład: "miastach" -> Lemat: miasto, Przypadek: Miejscownik, Liczba: Mnoga, Rodzaj: Nijaki.
-
-2. MAPOWANIE RDZENIA: Znajdź Lemat w 'osnova.json'. Pobierz odpowiadający mu słowiański rdzeń.
-   Jeśli lematu nie ma w 'osnova.json' -> zwróć (ne najdeno slova).
-
-3. WYBÓR WZORCA: W 'vuzor.json' znajdź tabelę odmiany dla danego rodzaju/typu rdzenia.
-
-4. GENEROWANIE: Pobierz słowiańską końcówkę odpowiadającą ustalonemu w kroku 1 przypadkowi i liczbie.
-
-5. SYNTEZA: Połącz Słowiański Rdzeń + Słowiańska Końcówka.
-
---------------------------------------------------
-PRZYMIOTNIKI
---------------------------------------------------
-
-Przymiotnik musi mieć:
-
-- ten sam przypadek
-- tę samą liczbę
-- ten sam rodzaj
-
-co rzeczownik.
-
-Przymiotnik zawsze stoi przed rzeczownikiem.
-
---------------------------------------------------
-ZASADY BEZWZGLĘDNE
---------------------------------------------------
-
-1. Nie wolno zgadywać końcówek.
-
-2. Nie wolno tworzyć nowych form.
-
-3. Jeśli słowo nie istnieje w osnova.json zwróć:
-
-(ne najdeno slova)
-
-4. Zachowuj:
-
-- interpunkcję
-- wielkie litery
-- odstępy
-- kolejność zdania
-
-5. Nie dodawaj komentarzy.
-
-6. Nie pokazuj analizy.
-
---------------------------------------------------
-FORMAT
---------------------------------------------------
-
-Zwróć tylko wynikowy tekst.
-
---------------------------------------------------
-PRZYKŁAD
-
-Wejście:
-
-W ogrodzie.
-
-Wynik:
-
-Vu obgordě.
+ZASADY BEZWZGLĘDNE:
+1. Jeśli polskiego słowa (lub jego lematu) nie ma na liście mapowania, zwróć: (ne najdeno slova).
+2. Wyjątek: Przyimki (np. "w", "na", "z") i spójniki tłumacz automatycznie (np. w -> vu).
+3. Zachowaj wielkie litery i interpunkcję.
+4. Nie dopisuj żadnych wyjaśnień. Tylko wynik.
 """
 
         try:
+            # Używamy modelu gpt-4o lub llama-3 (zależnie od tego co masz w Groq)
+            # Podmień "openai/gpt-oss-120b" na właściwą nazwę modelu w Groq (np. "llama3-8b-8192")
             chat_completion = client.chat.completions.create(
                 messages=[
                     {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": f"LISTA MAPOWANIA:\n{mapping_rules}\n\nTEKST ŹRÓDŁOWY:\n{user_input}"}
+                    {"role": "user", "content": f"TEKST DO KONWERSJI: {user_input}"}
                 ],
-                model="openai/gpt-oss-120b",
+                model="llama3-8b-8192", 
                 temperature=0.0
             )
             response_text = chat_completion.choices[0].message.content.strip()
 
-            # Wyświetlanie wyniku
             st.markdown("### Vynik perklada:")
             st.success(response_text)
 
@@ -230,27 +144,3 @@ Vu obgordě.
             with st.expander("Użyte mapowanie z bazy"):
                 for m in matches:
                     st.write(f"'{m['polish']}' → `{m['slovian']}`")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
