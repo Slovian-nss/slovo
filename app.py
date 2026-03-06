@@ -107,7 +107,7 @@ if user_input:
             TWOJE JEDYNE ZADANIE: Przetłumacz tekst używając WYŁĄCZNIE form z sekcji BAZA.
             
             ZASADY KRYTYCZNE:
-            1. Jeśli w BAZIE podano formę (np. 'esmy'), MUSISZ jej użyć. Nie poprawiaj jej na 'esmь'.
+            1. Jeśli w BAZIE, czyli w pliku osnova.json i vuzor.json podano formę (np. dla słowa 'jesteśmy' to 'esmy'), MUSISZ jej użyć. Nie poprawiaj jej na nic innego.
             2. Ignoruj własną wiedzę historyczną, jeśli jest sprzeczna z BAZĄ.
             3. Zakaz używania cyrylicy (wyjątek: znak ь).
             4. Przymiotnik zawsze przed rzeczownikiem.
@@ -135,4 +135,5 @@ if user_input:
             with st.expander("Užito žerdlo jiz osnovy"):
                 for m in matches:
                     st.write(f"**{m['polish']}** → `{m['slovian']}` ({m.get('type and case','')})")
+
 
