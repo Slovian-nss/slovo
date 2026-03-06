@@ -88,26 +88,24 @@ if user_input:
             for m in matches
         ])
 
-        system_prompt = """Jesteś zaawansowanym procesorem językowym, który przekłada tekst polski na język słowiański (prasłowiański), wykorzystując WYŁĄCZNIE bazy 'osnova.json' (rdzenie/hasła) oraz 'vuzor.json' (tabele odmian).
+        system_prompt = """Jesteś silnikiem gramatycznym języka słowiańskiego. Twoim jedynym zadaniem jest generowanie form fleksyjnych na podstawie plików 'osnova.json' i 'vuzor.json'.
 
-TWOJE DZIAŁANIE (KROK PO KROKU):
-1. DEKONSTRUKCJA: Weź każde polskie słowo ze zdania i określ jego formę gramatyczną (Przypadek, Liczba, Rodzaj, Osoba, Czas).
-2. MAPOWANIE RDZENIA: Znajdź odpowiednik tego słowa w 'osnova.json'. Pobierz przypisany do niego schemat odmiany (klucz "vuzor").
-3. SYNTEZA KOŃCÓWKI: Przejdź do 'vuzor.json', znajdź odpowiedni schemat i wybierz końcówkę pasującą do formy gramatycznej określonej w kroku 1.
-4. ZŁOŻENIE: Połącz rdzeń z 'osnova.json' z końcówką z 'vuzor.json'.
+STRUKTURA LOGICZNA PLIKÓW:
+- osnova.json: Zawiera pary {"polskie_slowo": "slowianski_rdzen", "vuzor": "nazwa_wzoru"}.
+- vuzor.json: Zawiera tabele końcówek dla każdego "vuzor" (np. mianownik: -o, miejscownik: -u).
 
-RYGORYSTYCZNE ZASADY GRAMATYKI:
-- ZGODNOŚĆ: Przymiotnik MUSI mieć tę samą liczbę, rodzaj i przypadek co rzeczownik, który opisuje.
-- SZYK: Przymiotniki (adjective) i przysłówki (adverb) ZAWSZE poprzedzają rzeczownik (noun).
-- BRAK W BAZIE: Jeśli słowa nie ma w 'osnova.json', pozostaw polskie słowo bez zmian. Nigdy nie zmyślaj końcówek spoza 'vuzor.json'.
+TWOJA INSTRUKCJA WYKONAWCZA:
+Dla każdego polskiego słowa w tekście wejściowym wykonaj algorytm:
+1. Znajdź polskie słowo w 'osnova.json'. Jeśli go nie ma -> napisz "(ne najdeno slova)" i przejdź do następnego.
+2. Zidentyfikuj PRZYPADEK, LICZBĘ i RODZAJ polskiego słowa w kontekście zdania (np. "w ogrodzie" = miejscownik, l.poj, męski).
+3. Pobierz "slowianski_rdzen" oraz przypisany mu "vuzor" z 'osnova.json'.
+4. Wyciągnij odpowiednią końcówkę z 'vuzor.json' pasującą do zidentyfikowanego przypadku/liczby/rodzaju.
+5. SKLEJ: [slowianski_rdzen] + [koncowka].
 
-ZASADY FORMATOWANIA:
-- Wielkość liter: Zachowaj format wejściowy (Słowo -> Slovian, słowo -> slovian, SŁOWO -> SLOVIAN).
-- Znaki specjalne: Nie zmieniaj interpunkcji, spacji, linków ani symboli.
-- Wynik: Zwróć TYLKO przetworzony tekst. Zakaz komentarzy i wyjaśnień.
-
-LOGIKA OPERACYJNA: 
-Traktuj 'vuzor.json' jako nadrzędną instrukcję budowy słowa, a nie tylko listę przykładów. Każde słowo wyjściowe musi być wynikiem dopasowania polskiej gramatyki do tabeli w vuzor."""
+ZASADY BEZWZGLĘDNE:
+- ZAKAZ kopiowania polskich końcówek. Słowo wyjściowe MUSI być złożeniem rdzenia i końcówki z Twoich plików.
+- SZYK: Przymiotnik i przysłówek ZAWSZE przed rzeczownikiem.
+- FORMAT: Zachowaj interpunkcję, wielkość liter i brak dodatkowego komentarza."""
 
         try:
             chat_completion = client.chat.completions.create(
@@ -131,6 +129,7 @@ Traktuj 'vuzor.json' jako nadrzędną instrukcję budowy słowa, a nie tylko lis
             with st.expander("Użyte mapowanie z bazy"):
                 for m in matches:
                     st.write(f"'{m['polish']}' → `{m['slovian']}`")
+
 
 
 
