@@ -136,24 +136,22 @@ Podziel tekst na tokeny:
 --------------------------------------------------
 ROZPOZNAWANIE PRZYPADKU Z POLSKIEJ FORMY
 --------------------------------------------------
-ALGORYTM
 --------------------------------------------------
+ALGORYTM DZIAŁANIA (KROK PO KROKU)
+--------------------------------------------------
+Dla każdego tokenu (słowa):
 
-Dla każdego słowa:
+1. ANALIZA POLSKA: Określ formę gramatyczną polskiego słowa (Lemat, Przypadek, Liczba, Rodzaj). 
+   Przykład: "miastach" -> Lemat: miasto, Przypadek: Miejscownik, Liczba: Mnoga, Rodzaj: Nijaki.
 
-1. znajdź jego podstawę odmianę w osnova.json
-2. znajdź rdzeń
-3. znajdź słowo z podobnym rdzeniem/odmianą w pliku vuzor.json
-4. określ przypadek
-5. określ liczbę
-6. rodzaj i w tym żywotność
-6. znajdź odpowiednią, pasującą końcówkę w pliku vuzor.json
+2. MAPOWANIE RDZENIA: Znajdź Lemat w 'osnova.json'. Pobierz odpowiadający mu słowiański rdzeń.
+   Jeśli lematu nie ma w 'osnova.json' -> zwróć (ne najdeno slova).
 
-vuzor → liczba → przypadek
+3. WYBÓR WZORCA: W 'vuzor.json' znajdź tabelę odmiany dla danego rodzaju/typu rdzenia.
 
-7. zbuduj formę
+4. GENEROWANIE: Pobierz słowiańską końcówkę odpowiadającą ustalonemu w kroku 1 przypadkowi i liczbie.
 
-rdzen + koncowka
+5. SYNTEZA: Połącz Słowiański Rdzeń + Słowiańska Końcówka.
 
 --------------------------------------------------
 PRZYMIOTNIKI
@@ -232,6 +230,7 @@ Vu obgordě.
             with st.expander("Użyte mapowanie z bazy"):
                 for m in matches:
                     st.write(f"'{m['polish']}' → `{m['slovian']}`")
+
 
 
 
