@@ -5,6 +5,7 @@ import re
 from collections import defaultdict
 from groq import Groq
 
+# Konfiguracja strony
 st.set_page_config(page_title="Perkladačь slověnьskogo ęzyka", layout="centered")
 
 st.markdown("""
@@ -16,70 +17,71 @@ st.markdown("""
 
 # ================== GROQ ==================
 
-client = Groq(api_key=st.secrets["GROQ_API_KEY"])
+# Upewnij się, że masz klucz w .streamlit/secrets.toml
+try:
+    client = Groq(api_key=st.secrets["GROQ_API_KEY"])
+except Exception as e:
+    st.error("Błąd konfiguracji klucza API. Sprawdź st.secrets.")
 
-# ================== ŁADOWANIE ==================
+# ================== ŁADOWANIE DANYCH ==================
 
 @st.cache_data
 def load_json(filename):
     if not os.path.exists(filename):
         return []
-    with open(filename, "r", encoding="utf-8") as f:
-        return json.load(f)
+    try:
+        with open(filename, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return []
 
 osnova = load_json("osnova.json")
-vuzor  = load_json("vuzor.json")
+vuzor = load_json("vuzor.json")
 
 # ================== INDEKS SŁOWNIKA ==================
 
 @st.cache_data
 def build_dictionary(data):
     dic = defaultdict(list)
-
     for entry in data:
-        key = entry.get("polish","").lower().strip()
+        # Zakładamy, że klucz w JSON to "polish", a wynik to "slovian"
+        key = entry.get("polish", "").lower().strip()
         if key:
             dic[key].append(entry)
-
     return dic
 
 dictionary = build_dictionary(osnova)
 
-# ================== WYSZUKIWANIE ==================
+# ================== WYSZUKIWANIE KONTEKSTOWE ==================
 
 def get_context(text, dic):
-
-    words = re.findall(r'\w+', text.lower())
+    # Wyciąganie słów (usuwanie interpunkcji do wyszukiwania)
+    words = re.findall(r'\b\w+\b', text.lower())
     results = []
     seen = set()
 
     for w in words:
-
-        # dokładne dopasowanie
+        # 1. Dokładne dopasowanie
         if w in dic:
             for e in dic[w]:
-                key = (e["polish"], e["slovian"])
-                if key not in seen:
+                pair = (e.get("polish"), e.get("slovian"))
+                if pair not in seen:
                     results.append(e)
-                    seen.add(key)
-
-        # prefix search
+                    seen.add(pair)
+        
+        # 2. Szukanie po rdzeniu (jeśli słowo długie)
         elif len(w) >= 4:
             pref = w[:4]
-
             for base, entries in dic.items():
                 if base.startswith(pref):
-
                     for e in entries:
-                        key = (e["polish"], e["slovian"])
-
-                        if key not in seen:
+                        pair = (e.get("polish"), e.get("slovian"))
+                        if pair not in seen:
                             results.append(e)
-                            seen.add(key)
-
+                            seen.add(pair)
     return results
 
-# ================== INTERFEJS ==================
+# ================== INTERFEJS UŻYTKOWNIKA ==================
 
 st.title("Perkladačь slověnьskogo ęzyka")
 
@@ -90,42 +92,40 @@ user_input = st.text_area(
 )
 
 if user_input:
-
     with st.spinner("Przetwarzanie..."):
-
+        # Pobranie pasujących słówek ze słownika
         matches = get_context(user_input, dictionary)
 
+        # Formułowanie danych dla modelu
         mapping = "\n".join(
-            f"PL '{m['polish']}' → SL '{m['slovian']}'"
-            for m in matches
+            [f"PL '{m.get('polish')}' -> SL '{m.get('slovian')}' (Kategoria: {m.get('category', 'nieznana')})" for m in matches]
         )
 
-        system_prompt = f"""
-Jesteś precyzyjnym tłumaczem na język prasłowiański.
-
-Używasz WYŁĄCZNIE słów z danych.
+        system_prompt = f"""Jesteś precyzyjnym tłumaczem na język prasłowiański.
+Używasz WYŁĄCZNIE słów dostarczonych w DANYCH SŁOWNIKOWYCH.
 
 DANE SŁOWNIKOWE:
 {mapping}
 
-WZORY:
-{json.dumps(vuzor[:20], ensure_ascii=False)}
+PRZYKŁADOWE WZORY ODMIAN:
+{json.dumps(vuzor[:15], ensure_ascii=False)}
 
 ZASADY BEZWZGLĘDNE:
-1. Jeśli nie ma odmiany słowiańskiego słowa (lub jego podstawowej odmiany), to wtedy napisz w jego miejscu (ne najdeno slova) i tłumacz dalej to co możesz.
-2. SZYK: Przymiotniki (oznaczone są one jako: adjective - pridavьnik) i przysłówki (oznaczone są one jako: adverb - prislovok) zawsze są przed rzeczownikami (oznaczone są one jako: noun - jimenьnik).
-3. FORMAT: Zachowaj interpunkcję, odwzorowanie, wielkość liter, spacje, odstępy, znaki matematyczne, linkowanie i brak dodatkowego komentarza."""
+1. Jeśli w danych słownikowych nie ma odpowiednika dla słowa, wstaw "(ne najdeno slova)" i tłumacz dalej.
+2. SZYK: Przymiotniki (adjective) i przysłówki (adverb) ZAWSZE przed rzeczownikami (noun).
+3. FORMAT: Zachowaj oryginalną interpunkcję, wielkość liter i układ tekstu. 
+4. Nie dodawaj żadnego komentarza od siebie, tylko czyste tłumaczenie."""
 
         try:
-
+            # POPRAWKA: Zmiana modelu na istniejący w Groq (np. llama-3.3-70b-versatile lub mixtral-8x7b-32768)
             chat = client.chat.completions.create(
-                model="openai/gpt-oss-120b",
+                model="llama-3.3-70b-versatile", 
                 messages=[
-                    {"role":"system","content":system_prompt},
-                    {"role":"user","content":user_input}
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_input}
                 ],
-                temperature=0,
-                max_tokens=800
+                temperature=0.1,
+                max_tokens=1000
             )
 
             result = chat.choices[0].message.content.strip()
@@ -136,3 +136,6 @@ ZASADY BEZWZGLĘDNE:
         except Exception as e:
             st.error(f"Blǫd perklada: {e}")
 
+# Stopka pomocnicza
+if not osnova:
+    st.warning("Uwaga: Nie znaleziono pliku osnova.json. Słownik jest pusty.")
