@@ -111,12 +111,10 @@ DANE SŁOWNIKOWE:
 WZORY:
 {json.dumps(vuzor[:20], ensure_ascii=False)}
 
-Zasady:
-- przymiotnik przed rzeczownikiem
-- zachowaj interpunkcję
-- jeśli brak słowa → (ne najdeno slova)
-- bez komentarzy
-"""
+ZASADY BEZWZGLĘDNE:
+1. Jeśli nie ma odmiany słowiańskiego słowa (lub jego podstawowej odmiany), to wtedy napisz w jego miejscu (ne najdeno slova) i tłumacz dalej to co możesz.
+2. SZYK: Przymiotniki (oznaczone są one jako: adjective - pridavьnik) i przysłówki (oznaczone są one jako: adverb - prislovok) zawsze są przed rzeczownikami (oznaczone są one jako: noun - jimenьnik).
+3. FORMAT: Zachowaj interpunkcję, odwzorowanie, wielkość liter, spacje, odstępy, znaki matematyczne, linkowanie i brak dodatkowego komentarza."""
 
         try:
 
@@ -136,4 +134,5 @@ Zasady:
             st.success(result)
 
         except Exception as e:
-            st.error(f"Błąd: {e}")
+            st.error(f"Blǫd perklada: {e}")
+
