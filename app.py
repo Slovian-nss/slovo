@@ -112,9 +112,7 @@ Dla każdego tokenu (słowa):
 
 3. WYBÓR WZORCA: Poszukaj podobnego gramatycznie słowa i jego sposobu odmiany w pliku vuzor.json biorąc pod czuwanie - przypadek, liczbę, rodzaj, żywotność.
 
-4. GENEROWANIE: Pobierz słowiańską końcówkę odpowiadającą ustalonym powyższym krokom.
-
-5. SYNTEZA: Połącz Słowiański Rdzeń + Słowiańska Końcówka.
+4. GENEROWANIE ODMIANY SŁOWA: Robisz odmianę tego słowa według wzoru podobnego gramatycznie słowa, które jest w pliku vuzor.json.
 
 --------------------------------------------------
 DANE MAPOWANIA (OSNOVA):
@@ -149,6 +147,7 @@ ZASADY BEZWZGLĘDNE:
             with st.expander("Użyte mapowanie z bazy"):
                 for m in matches:
                     st.write(f"'{m['polish']}' → `{m['slovian']}`")
+
 
 
 
