@@ -106,10 +106,9 @@ ALGORYTM DZIAŁANIA (KROK PO KROKU)
 --------------------------------------------------
 Dla każdego tokenu (słowa):
 
-1. ANALIZA: Określ formę gramatyczną słowiańskiego (prasłowiańskiego) słowa (przypadek, liczbę, rodzaj, żywotność) i określasz podstawową formę tego słowa (lemat) po słowiańsku (prasłowiańsku) w pliku osnova.json
+1. ANALIZA: Określ formę gramatyczną słowiańskiego (prasłowiańskiego) słowa (przypadek, liczbę, rodzaj, żywotność) i określasz podstawową formę tego słowa po słowiańsku (prasłowiańsku) w pliku osnova.json
 
-2. MAPOWANIE RDZENIA: Znajdź lemat w pliku osnova.json.
-   Jeśli lematu nie ma w 'osnova.json' -> zwróć (ne najdeno slova).
+2. MAPOWANIE RDZENIA: Znajdź podstawową odmianę tego słowa w pliku osnova.json, a jeśli nie ma podstawowej odmiany w pliku 'osnova.json' -> zwróć (ne najdeno slova).
 
 3. WYBÓR WZORCA: Poszukaj podobnego gramatycznie słowa i jego sposobu odmiany w pliku vuzor.json biorąc pod czuwanie - przypadek, liczbę, rodzaj, żywotność.
 
@@ -123,7 +122,7 @@ DANE MAPOWANIA (OSNOVA):
 
 --------------------------------------------------
 ZASADY BEZWZGLĘDNE:
-1. Jeśli nie ma odmiany słowiańskiego słowa (lub jego lematu) to napisz w jego miejscu (ne najdeno slova) i tłumacz dalej to co możesz.
+1. Jeśli nie ma odmiany słowiańskiego słowa (lub jego podstawowej odmiany), to wtedy napisz w jego miejscu (ne najdeno slova) i tłumacz dalej to co możesz.
 2. SZYK: Przymiotniki (oznaczone są one jako: adjective - pridavьnik) i przysłówki (oznaczone są one jako: adverb - prislovok) zawsze są przed rzeczownikami (oznaczone są one jako: noun - jimenьnik).
 3. FORMAT: Zachowaj interpunkcję, odwzorowanie, wielkość liter, spacje, odstępy, znaki matematyczne, linkowanie i brak dodatkowego komentarza."""
 
@@ -150,6 +149,7 @@ ZASADY BEZWZGLĘDNE:
             with st.expander("Użyte mapowanie z bazy"):
                 for m in matches:
                     st.write(f"'{m['polish']}' → `{m['slovian']}`")
+
 
 
 
