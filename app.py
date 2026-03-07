@@ -3,6 +3,7 @@ import json
 import os
 import re
 from collections import defaultdict
+from groq import Groq
 
 # ================== KONFIGURACJA ==================
 st.set_page_config(page_title="Perkladačь slověnьskogo ęzyka", layout="centered")
@@ -10,112 +11,95 @@ st.set_page_config(page_title="Perkladačь slověnьskogo ęzyka", layout="cent
 st.markdown("""
 <style>
 .main {background:#0e1117}
-.stTextArea textarea {background:#1a1a1a;color:#dcdcdc;font-size:1.2rem;}
-.stSuccess {background-color: #1e2329; border: 1px solid #4caf50; font-size: 1.3rem;}
+.stTextArea textarea {background:#1a1a1a;color:#dcdcdc;font-size:1.1rem;}
 </style>
 """, unsafe_allow_html=True)
 
-# ================== INDEKSOWANIE ZAWANSOWANE ==================
+# Klient Groq (pobierany ze st.secrets)
+client = Groq(api_key=st.secrets["GROQ_API_KEY"])
+
+# ================== ŁADOWANIE DANYCH ==================
 @st.cache_data
 def load_all_data():
     def load_json(name):
         if not os.path.exists(name): return []
         with open(name, "r", encoding="utf-8") as f: return json.load(f)
     
-    vuzor = load_json("vuzor.json")
-    osnova = load_json("osnova.json")
-    
-    # Indeksowanie: polskie_slowo -> lista rekordów
-    db = defaultdict(list)
-    
-    # KLUCZ: Najpierw ładujemy VUZOR (odmiany), potem OSNOVA (podstawy)
-    for entry in vuzor + osnova:
-        pl = entry.get("polish", "").lower().strip()
-        if pl:
-            db[pl].append(entry)
-            
-    return db
+    # Ładujemy wszystko: osnova i vuzor
+    return load_json("vuzor.json") + load_json("osnova.json")
 
-DB = load_all_data()
+DATA = load_all_data()
 
-# ================== SILNIK TŁUMACZĄCY V5 ==================
+# ================== PRZYGOTOWANIE KONTEKSTU DLA LLM ==================
 
-# Mapa przyimków sterujących przypadkiem
-RULES = {
-    "w": "locative", "we": "locative", "o": "locative", "na": "locative",
-    "do": "genitive", "z": "genitive", "dla": "genitive", "bez": "genitive",
-    "ku": "dative"
-}
+def get_smart_context(text):
+    words = re.findall(r'\w+', text.lower())
+    relevant_entries = []
+    seen = set()
 
-def find_translation(pl_word, required_case=None):
-    # 1. SZUKANIE DOKŁADNE (np. "ogrodzie" w vuzor.json)
-    options = DB.get(pl_word, [])
-    
-    if required_case:
-        for opt in options:
-            info = opt.get("type and case", "").lower()
-            # Szukamy rzeczownika w konkretnym przypadku (np. locative)
-            if "noun" in info and required_case in info:
-                return opt.get("slovian")
+    for w in words:
+        # Szukamy wszystkiego, co pasuje do słowa lub jego rdzenia
+        stem = w[:4] if len(w) >= 4 else w
+        for entry in DATA:
+            pl = entry.get("polish", "").lower()
+            # Dodajemy tylko jeśli polskie słowo pasuje lub zaczyna się tak samo
+            if w == pl or (len(w) >= 4 and pl.startswith(stem)):
+                # Tworzymy unikalny klucz, by nie dublować identycznych wpisów
+                key = (entry['polish'], entry['slovian'], entry.get('type and case', ''))
+                if key not in seen:
+                    relevant_entries.append(entry)
+                    seen.add(key)
+    return relevant_entries
 
-    if options:
-        # Jeśli brak kontekstu, bierzemy pierwszy pasujący rekord
-        return options[0].get("slovian")
+# ================== INTERFEJS I LOGIKA HYBRYDOWA ==================
 
-    # 2. INTELIGENTNE POWIĄZANIE (jeśli "ogrodzie" nie ma w bazie, szukaj rdzenia)
-    # W Twoich danych "ogród" -> "obgord". Jeśli user wpisze "ogrodzie", szukamy "ogród"
-    if len(pl_word) >= 4:
-        # Próbujemy znaleźć słowo podstawowe dla formy odmienionej
-        # (Uproszczony mechanizm dla rdzeni takich jak ogrod- / ogród-)
-        stem = pl_word[:4]
-        for pl_key, entries in DB.items():
-            if pl_key.startswith(stem):
-                if required_case:
-                    for e in entries:
-                        info = e.get("type and case", "").lower()
-                        if "noun" in info and required_case in info:
-                            return e.get("slovian")
-                return entries[0].get("slovian")
-
-    return None
-
-def translate_v5(text):
-    tokens = re.findall(r'\w+|[^\w\s]|\s+', text)
-    result = []
-    current_case = None
-
-    for token in tokens:
-        if not re.match(r'\w+', token):
-            result.append(token)
-            continue
-
-        low = token.lower().strip()
-        
-        # Pobieramy tłumaczenie
-        translated = find_translation(low, current_case)
-        
-        # Przyimek ustawia przypadek dla NASTĘPNEGO słowa
-        current_case = RULES.get(low)
-
-        if translated:
-            if token[0].isupper(): translated = translated.capitalize()
-            result.append(translated)
-        else:
-            result.append("(ne najdeno slova)")
-
-    return "".join(result)
-
-# ================== UI ==================
 st.title("Perkladačь slověnьskogo ęzyka")
-st.subheader("Silnik V5: Priorytet tabeli Vuzor")
+st.subheader("Silnik Hybrydowy: Baza danych + Groq AI")
 
-user_input = st.text_area("Vupiši rěčenьje:", placeholder="Np. W moim ogrodzie.", height=150)
+user_input = st.text_area("Vupiši rěčenьje:", placeholder="Np. W moim ogrodzie są ludzie.", height=150)
 
 if user_input:
-    final_text = translate_v5(user_input)
-    st.markdown("### Vynik perklada:")
-    st.success(final_text)
-    
-    with st.expander("Analiza formy 'ogrodzie'"):
-        st.write("Silnik zidentyfikował przyimek 'W' i wymusił formę Miejscownika (locative).")
-        st.write("Dzięki powiązaniu rdzenia ogrod- z rekordami rzeczowników, wybrano 'obgordě' zamiast bezokolicznika.")
+    with st.spinner("Analiza gramatyczna i tłumaczenie..."):
+        # 1. Wyciągamy pasujące rekordy z Twoich plików JSON
+        matches = get_smart_context(user_input)
+        
+        # 2. Formatujemy dane dla AI tak, by wiedziało o częściach mowy
+        mapping = "\n".join([
+            f"- PL: '{m['polish']}' -> SL: '{m['slovian']}' ({m.get('type and case', 'podstawowy')})"
+            for m in matches
+        ])
+
+        system_prompt = f""" Jesteś ekspertem języka prasłowiańskiego.
+Twoim zadaniem jest przetłumaczyć zdanie używając WYŁĄCZNIE form podanych w poniższych danych.
+
+DANE SŁOWNIKOWE (użyj odpowiedniej formy gramatycznej):
+{mapping}
+
+ZASADY:
+1. Słowo 'w' tłumacz jako 'Vu'.
+2. Wybieraj RZECZOWNIKI (noun) dla obiektów, a nie CZASOWNIKI (verb) o podobnym rdzeniu.
+3. Jeśli w danych jest forma z 'locative' dla słowa po przyimku 'w', użyj jej (np. obgordě).
+4. Jeśli słowa nie ma w danych, napisz (ne najdeno slova).
+5. Wynik ma zawierać TYLKO przetłumaczone zdanie, bez komentarzy. """
+
+        try:
+            chat = client.chat.completions.create(
+                model="llama-3.3-70b-versatile", # Najlepszy model na Groq do języków słowiańskich
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": f"Przetłumacz: {user_input}"}
+                ],
+                temperature=0 # Zerowa kreatywność = trzymanie się Twoich tabel
+            )
+
+            result = chat.choices[0].message.content.strip()
+
+            st.markdown("### Vynik perklada:")
+            st.success(result)
+
+        except Exception as e:
+            st.error(f"Błąd API: {e}")
+
+    with st.expander("Zobacz dane przekazane do AI"):
+        st.write("To są rekordy, które AI dostało do wyboru z Twoich plików JSON:")
+        st.json(matches)
