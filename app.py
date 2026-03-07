@@ -15,15 +15,15 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ================== INDEKSOWANIE Z PRIORYTETAMI ==================
+# ================== INDEKSOWANIE DANYCH ==================
 @st.cache_data
 def load_data():
     def load_json(name):
         if not os.path.exists(name): return []
         with open(name, "r", encoding="utf-8") as f: return json.load(f)
     
-    # Tworzymy bazę, gdzie pod jednym polskim słowem mamy listę wszystkich form
     db = defaultdict(list)
+    # Łączymy vuzor i osnova
     for entry in load_json("vuzor.json") + load_json("osnova.json"):
         pl = entry.get("polish", "").lower().strip()
         if pl: db[pl].append(entry)
@@ -31,48 +31,45 @@ def load_data():
 
 DB = load_data()
 
-# ================== ZAAWANSOWANY SILNIK DOPASOWANIA ==================
+# ================== SILNIK TŁUMACZĄCY V4 ==================
 
-# Rozszerzona lista przyimków i ich przypadków
+# Przyimki i przypadek, który wymuszają
 RULES = {
     "w": "locative", "we": "locative", "o": "locative", "na": "locative",
     "do": "genitive", "z": "genitive", "dla": "genitive", "bez": "genitive",
-    "ku": "dative", "przeciw": "dative",
-    "między": "instrumental", "nad": "instrumental", "pod": "instrumental"
+    "ku": "dative", "przeciw": "dative"
 }
 
-def find_perfect_word(pl_word, required_case=None):
-    # 1. Szukamy dokładnego dopasowania słowa w bazie
+def find_correct_form(pl_word, required_case=None):
     options = DB.get(pl_word, [])
     
-    if options:
-        # Jeśli szukamy konkretnego przypadku (np. locative)
-        if required_case:
-            for opt in options:
-                if required_case in opt.get("type and case", "").lower():
-                    return opt.get("slovian")
-        # Jeśli nie ma wymogu lub nie znaleźliśmy przypadku, bierzemy pierwszy rekord (zazwyczaj mianownik)
-        return options[0].get("slovian")
-
-    # 2. Jeśli brak dokładnego słowa, szukamy po rdzeniu (min. 4 litery), 
-    # ale wybieramy formę, która pasuje do przypadku!
-    if len(pl_word) >= 4:
+    if not options and len(pl_word) >= 4:
+        # Próba znalezienia po rdzeniu, jeśli brak dokładnego słowa
         stem = pl_word[:4]
-        potential_matches = []
         for key, entries in DB.items():
             if key.startswith(stem):
-                potential_matches.extend(entries)
-        
-        if potential_matches:
-            if required_case:
-                for pm in potential_matches:
-                    if required_case in pm.get("type and case", "").lower():
-                        return pm.get("slovian")
-            return potential_matches[0].get("slovian")
+                options.extend(entries)
+
+    if options:
+        # Jeśli szukamy po przyimku, MUSI to być rzeczownik (noun) w odpowiednim przypadku
+        if required_case:
+            for opt in options:
+                info = opt.get("type and case", "").lower()
+                # Kluczowa poprawka: musi zawierać 'noun' ORAZ wymagany przypadek
+                if "noun" in info and required_case in info:
+                    return opt.get("slovian")
+            
+            # Jeśli nie znaleźliśmy idealnego rzeczownika, szukamy jakiegokolwiek rzeczownika
+            for opt in options:
+                if "noun" in opt.get("type and case", "").lower():
+                    return opt.get("slovian")
+
+        # Jeśli brak kontekstu przyimkowego, bierzemy pierwszy rekord
+        return options[0].get("slovian")
 
     return None
 
-def translate_logic(text):
+def translate_v4(text):
     tokens = re.findall(r'\w+|[^\w\s]|\s+', text)
     output = []
     next_case = None
@@ -84,10 +81,10 @@ def translate_logic(text):
 
         low = token.lower().strip()
         
-        # Tłumaczymy słowo uwzględniając kontekst poprzedniego przyimka
-        translated = find_perfect_word(low, next_case)
+        # Pobieramy tłumaczenie uwzględniając wymóg części mowy
+        translated = find_correct_form(low, next_case)
         
-        # Ustawiamy przypadek dla następnego słowa
+        # Ustawiamy kontekst dla następnego słowa
         next_case = RULES.get(low)
 
         if translated:
@@ -98,16 +95,16 @@ def translate_logic(text):
 
     return "".join(output)
 
-# ================== UI ==================
+# ================== INTERFEJS ==================
 st.title("Perkladačь slověnьskogo ęzyka")
-st.subheader("Silnik V3: Precyzyjna odmiana gramatyczna")
+st.subheader("Silnik V4: Rozpoznawanie części mowy")
 
-user_input = st.text_area("Vupiši rěčenьje:", placeholder="Np. W moim mieście.", height=150)
+user_input = st.text_area("Vupiši rěčenьje:", placeholder="Np. W moim ogrodzie.", height=150)
 
 if user_input:
-    res = translate_logic(user_input)
+    res = translate_v4(user_input)
     st.markdown("### Vynik perklada:")
     st.success(res)
     
-    with st.expander("Logika odmiany"):
-        st.write("Silnik sprawdził przyimki i przeszukał plik vuzor.json pod kątem pasujących przypadków.")
+    with st.expander("Dlaczego tak odmieniło?"):
+        st.write("Silnik V4 wymusza wybór rzeczownika (`noun`) po przyimkach, co zapobiega myleniu 'ogrodu' z 'ogradzać'.")
