@@ -1,82 +1,160 @@
+# =========================
+# IMPORTY
+# =========================
+
 import streamlit as st
 import json
 import os
 import re
+from difflib import get_close_matches
 
-st.set_page_config(page_title="Perkladačь slověnьskogo ęzyka", layout="wide", page_icon="🌾")
 
-if "theme" not in st.session_state: st.session_state.theme = "dark"
-if "output" not in st.session_state: st.session_state.output = ""
-
-def get_css(theme):
-    if theme == "dark":
-        return """<style>
-.main {background:#0a0f1c;}
-.stTextArea textarea {background:#111827 !important;color:#e2e8f0 !important;font-size:1.15rem;border-radius:16px;border:1px solid #334155;}
-.translate-btn {background:linear-gradient(90deg,#2563eb,#1e40af);color:white;font-size:1.35rem;font-weight:700;padding:18px;border-radius:50px;border:none;width:100%;margin:12px 0;box-shadow:0 10px 30px rgba(37,99,235,0.4);}
-.translate-btn:hover {background:linear-gradient(90deg,#3b82f6,#2563eb);}
-h1 {color:#93c5fd;font-weight:700;}
-</style>"""
-    else:
-        return """<style>
-.main {background:#f8fafd;}
-.stTextArea textarea {background:#ffffff !important;color:#0f172a !important;font-size:1.15rem;border-radius:16px;border:1px solid #94a3b8;}
-.translate-btn {background:linear-gradient(90deg,#2563eb,#1e40af);color:white;font-size:1.35rem;font-weight:700;padding:18px;border-radius:50px;border:none;width:100%;margin:12px 0;}
-h1 {color:#1e3a8a;font-weight:700;}
-</style>"""
-
-st.markdown(get_css(st.session_state.theme), unsafe_allow_html=True)
+# =========================
+# ŁADOWANIE DANYCH
+# =========================
 
 @st.cache_data
-def load_data():
-    if not os.path.exists("osnova.json"): return {}, {}
-    data = json.load(open("osnova.json", encoding="utf-8"))
-    pl_sl = {e["polish"].strip().lower(): e["slovian"].strip() for e in data if e.get("polish") and e.get("slovian")}
-    return pl_sl, {v.lower(): k for k, v in pl_sl.items()}
+def load_json(path):
 
-pl_to_sl, sl_to_pl = load_data()
+    if not os.path.exists(path):
+        return []
 
-def translate(text, direction):
-    if not text.strip(): return ""
-    dic = pl_to_sl if direction == "pl→sl" else sl_to_pl
-    def repl(m):
-        w = m.group(0)
-        lower = w.lower()
-        t = dic.get(lower, w)
-        if w.isupper(): return t.upper()
-        if w and w[0].isupper(): return t.capitalize()
-        return t
-    return re.sub(r'\b\w+\b', repl, text)
+    with open(path, encoding="utf-8") as f:
+        return json.load(f)
 
-col_t, col_th = st.columns([4,1])
-with col_t: st.title("Perkladačь slověnьskogo ęzyka")
-with col_th:
-    if st.button("☀️" if st.session_state.theme == "dark" else "🌙", key="th"):
-        st.session_state.theme = "light" if st.session_state.theme == "dark" else "dark"
-        st.rerun()
 
-col1, colm, col2 = st.columns([5,1.1,5])
+osnova = load_json("osnova.json")
+vuzor = load_json("vuzor.json")
+
+
+# =========================
+# BUDOWA SŁOWNIKA
+# =========================
+
+def build_dictionary():
+
+    pl_ps = {}
+    ps_pl = {}
+
+    for e in osnova:
+
+        pl = e.get("polish","").lower()
+        ps = e.get("slovian","")
+
+        if pl:
+            pl_ps[pl] = ps
+            ps_pl[ps] = pl
+
+    return pl_ps, ps_pl
+
+
+pl_ps, ps_pl = build_dictionary()
+
+
+# =========================
+# TOKENIZER
+# =========================
+
+def tokenize(text):
+
+    return re.findall(r'\w+|\S', text)
+
+
+# =========================
+# TŁUMACZENIE PL → PS
+# =========================
+
+def translate_pl_ps(text):
+
+    words = tokenize(text)
+
+    result = []
+
+    for w in words:
+
+        key = w.lower()
+
+        if key in pl_ps:
+
+            result.append(pl_ps[key])
+
+        else:
+
+            sim = get_close_matches(key, pl_ps.keys(), 1)
+
+            if sim:
+                result.append(pl_ps[sim[0]])
+            else:
+                result.append("(ne najdeno slova)")
+
+    return " ".join(result)
+
+
+# =========================
+# TŁUMACZENIE PS → PL
+# =========================
+
+def translate_ps_pl(text):
+
+    words = tokenize(text)
+
+    result = []
+
+    for w in words:
+
+        if w in ps_pl:
+            result.append(ps_pl[w])
+        else:
+            result.append("(nieznane)")
+
+    return " ".join(result)
+
+
+# =========================
+# INTERFEJS
+# =========================
+
+st.set_page_config(layout="wide")
+
+st.title("Perkladačь slověnьskogo ęzyka")
+
+col1, col2 = st.columns(2)
 
 with col1:
-    src = st.selectbox("Z:", ["Polski", "Prasłowiański"], key="src")
-    input_text = st.text_area("Tekst źródłowy", height=440, placeholder="Wpisz tekst...", key="input_text")
 
-with colm:
-    st.write(""); st.write(""); st.write("")
-    if st.button("⇄", key="sw", use_container_width=True):
-        st.session_state.input_text, st.session_state.output = st.session_state.get("output",""), st.session_state.get("input_text","")
-        st.session_state.src = "Prasłowiański" if src == "Polski" else "Polski"
-        st.rerun()
+    source_lang = st.selectbox(
+        "Język źródłowy",
+        ["polski","prasłowiański"]
+    )
+
+    text = st.text_area(
+        "Tekst",
+        height=250
+    )
 
 with col2:
-    tgt = "Prasłowiański" if src == "Polski" else "Polski"
-    st.selectbox("Na:", [tgt], disabled=True)
-    st.text_area("Tłumaczenie", value=st.session_state.output, height=440, disabled=True)
 
-if st.button("**Przełóż**", type="primary", use_container_width=True):
-    if st.session_state.get("input_text","").strip():
-        d = "pl→sl" if src == "Polski" else "sl→pl"
-        st.session_state.output = translate(st.session_state.input_text, d)
-        st.rerun()
+    target_lang = st.selectbox(
+        "Język docelowy",
+        ["prasłowiański","polski"]
+    )
 
-st.caption("Dla innych języków najpierw przetłumacz na polski (pośrednik zawsze polski)")
+    if text:
+
+        if source_lang == "polski" and target_lang == "prasłowiański":
+
+            result = translate_pl_ps(text)
+
+        elif source_lang == "prasłowiański" and target_lang == "polski":
+
+            result = translate_ps_pl(text)
+
+        else:
+
+            result = "Nieobsługiwane"
+
+        st.text_area(
+            "Tłumaczenie",
+            value=result,
+            height=250
+        )
