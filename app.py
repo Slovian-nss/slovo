@@ -2,11 +2,8 @@ import streamlit as st
 import json
 import os
 import re
-from collections import defaultdict
-from groq import Groq
 
-st.set_page_config(page_title="Perkladačь slověnьskogo ęzyka", layout="centered")
-
+st.set_page_config(page_title="Perkladačь slověnьskogo ęzyka", layout="wide")
 st.markdown("""
 <style>
 .main {background:#0e1117}
@@ -14,125 +11,60 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ================== GROQ ==================
-
-client = Groq(api_key=st.secrets["GROQ_API_KEY"])
-
-# ================== ŁADOWANIE ==================
-
 @st.cache_data
 def load_json(filename):
-    if not os.path.exists(filename):
-        return []
-    with open(filename, "r", encoding="utf-8") as f:
-        return json.load(f)
+    return json.load(open(filename, encoding="utf-8")) if os.path.exists(filename) else []
 
 osnova = load_json("osnova.json")
-vuzor  = load_json("vuzor.json")
-
-# ================== INDEKS SŁOWNIKA ==================
 
 @st.cache_data
-def build_dictionary(data):
-    dic = defaultdict(list)
+def build_dictionaries(data):
+    pl_sl = {}
+    sl_pl = {}
+    for e in data:
+        pl = e.get("polish","").strip().lower()
+        sl = e.get("slovian","").strip().lower()
+        if pl and sl:
+            pl_sl[pl] = sl
+            sl_pl[sl] = pl
+    return pl_sl, sl_pl
 
-    for entry in data:
-        key = entry.get("polish","").lower().strip()
-        if key:
-            dic[key].append(entry)
+pl_to_sl, sl_to_pl = build_dictionaries(osnova)
 
-    return dic
-
-dictionary = build_dictionary(osnova)
-
-# ================== WYSZUKIWANIE ==================
-
-def get_context(text, dic):
-
-    words = re.findall(r'\w+', text.lower())
-    results = []
-    seen = set()
-
-    for w in words:
-
-        # dokładne dopasowanie
-        if w in dic:
-            for e in dic[w]:
-                key = (e["polish"], e["slovian"])
-                if key not in seen:
-                    results.append(e)
-                    seen.add(key)
-
-        # prefix search
-        elif len(w) >= 4:
-            pref = w[:4]
-
-            for base, entries in dic.items():
-                if base.startswith(pref):
-
-                    for e in entries:
-                        key = (e["polish"], e["slovian"])
-
-                        if key not in seen:
-                            results.append(e)
-                            seen.add(key)
-
-    return results
-
-# ================== INTERFEJS ==================
+def translate(text, direction):
+    if not text.strip(): return ""
+    tokens = re.findall(r'\w+|[^\w\s]', text)
+    result = []
+    for t in tokens:
+        if re.match(r'\w+', t):
+            lower = t.lower()
+            trans = (pl_to_sl.get(lower, t) if direction == "pl_to_sl" else sl_to_pl.get(lower, t))
+            if t.isupper(): trans = trans.upper()
+            elif t[0].isupper(): trans = trans.capitalize()
+            result.append(trans)
+        else:
+            result.append(t)
+    return re.sub(r'\s+', ' ', ''.join(result)).strip()
 
 st.title("Perkladačь slověnьskogo ęzyka")
 
-user_input = st.text_area(
-    "Vupiši slovo alibo rěčenьje:",
-    placeholder="Np. W miastach siła.",
-    height=150
-)
+col1, col_mid, col2 = st.columns([5, 0.8, 5])
 
-if user_input:
+with col1:
+    source = st.selectbox("Z:", ["Polski", "Prasłowiański"], key="src_lang")
+    text_in = st.text_area("Tekst źródłowy", height=350, placeholder="Wpisz tekst...")
 
-    with st.spinner("Przetwarzanie..."):
+with col_mid:
+    if st.button("⇄", use_container_width=True):
+        st.session_state.src_lang = "Prasłowiański" if source == "Polski" else "Polski"
+        st.rerun()
 
-        matches = get_context(user_input, dictionary)
+with col2:
+    target = "Prasłowiański" if source == "Polski" else "Polski"
+    st.selectbox("Na:", [target], disabled=True)
+    if text_in:
+        dir_ = "pl_to_sl" if source == "Polski" else "sl_to_pl"
+        out = translate(text_in, dir_)
+        st.text_area("Tłumaczenie", value=out, height=350, disabled=True)
 
-        mapping = "\n".join(
-            f"PL '{m['polish']}' → SL '{m['slovian']}'"
-            for m in matches
-        )
-
-        system_prompt = f"""
-Jesteś precyzyjnym tłumaczem na język prasłowiański.
-
-Używasz WYŁĄCZNIE słów z danych.
-
-DANE SŁOWNIKOWE:
-{mapping}
-
-WZORY:
-{json.dumps(vuzor[:20], ensure_ascii=False)}
-
-ZASADY BEZWZGLĘDNE:
-1. Jeśli nie ma odmiany słowiańskiego słowa (lub jego podstawowej odmiany), to wtedy napisz w jego miejscu (ne najdeno slova) i tłumacz dalej to co możesz.
-2. SZYK: Przymiotniki (oznaczone są one jako: adjective - pridavьnik) i przysłówki (oznaczone są one jako: adverb - prislovok) zawsze są przed rzeczownikami (oznaczone są one jako: noun - jimenьnik).
-3. FORMAT: Zachowaj interpunkcję, odwzorowanie, wielkość liter, spacje, odstępy, znaki matematyczne, linkowanie i brak dodatkowego komentarza."""
-
-        try:
-
-            chat = client.chat.completions.create(
-                model="openai/gpt-oss-120b",
-                messages=[
-                    {"role":"system","content":system_prompt},
-                    {"role":"user","content":user_input}
-                ],
-                temperature=0,
-                max_tokens=800
-            )
-
-            result = chat.choices[0].message.content.strip()
-
-            st.markdown("### Vynik perklada:")
-            st.success(result)
-
-        except Exception as e:
-            st.error(f"Blǫd perklada: {e}")
-
+st.caption("Dla innych języków najpierw przetłumacz na polski (pośrednik zawsze polski), potem tutaj")
