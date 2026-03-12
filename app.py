@@ -14,9 +14,14 @@ st.markdown("""
 
 @st.cache_data
 def load_json(filename):
-    if not os.path.exists(filename): return []
-    with open(filename, "r", encoding="utf-8") as f:
-        return json.load(f)
+    if not os.path.exists(filename):
+        return []
+    try:
+        with open(filename, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            return data if isinstance(data, list) else []
+    except:
+        return []
 
 osnova = load_json("osnova.json")
 selflearning = load_json("selflearning.json")
@@ -31,7 +36,7 @@ def build_dictionaries(data):
         sl = e.get("slovian","").lower().strip()
         if pl: pl_sl[pl].append(e.get("slovian",""))
         if sl: sl_pl[sl].append(e.get("polish",""))
-    return pl_sl, sl_to_pl
+    return pl_sl, sl_pl
 
 pl_to_sl, sl_to_pl = build_dictionaries(all_data)
 
