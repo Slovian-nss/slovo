@@ -1,25 +1,47 @@
-# =========================
-# IMPORTY
-# =========================
-
 import streamlit as st
 import json
 import os
 import re
+from collections import defaultdict
 from difflib import get_close_matches
 
+# ===============================
+# KONFIGURACJA STRONY
+# ===============================
 
-# =========================
-# ŁADOWANIE DANYCH
-# =========================
+st.set_page_config(
+    page_title="Perkladačь slověnьskogo ęzyka",
+    layout="wide"
+)
+
+st.markdown("""
+<style>
+
+.main {
+background:#0e1117;
+color:white;
+}
+
+textarea {
+background:#1a1a1a !important;
+color:#dcdcdc !important;
+font-size:18px !important;
+}
+
+</style>
+""", unsafe_allow_html=True)
+
+# ===============================
+# ŁADOWANIE PLIKÓW
+# ===============================
 
 @st.cache_data
-def load_json(path):
+def load_json(filename):
 
-    if not os.path.exists(path):
+    if not os.path.exists(filename):
         return []
 
-    with open(path, encoding="utf-8") as f:
+    with open(filename, "r", encoding="utf-8") as f:
         return json.load(f)
 
 
@@ -27,42 +49,72 @@ osnova = load_json("osnova.json")
 vuzor = load_json("vuzor.json")
 
 
-# =========================
+# ===============================
+# MEMORY (SAMOUCZENIE)
+# ===============================
+
+def load_memory():
+
+    if os.path.exists("memory.json"):
+
+        with open("memory.json", encoding="utf-8") as f:
+            return json.load(f)
+
+    return {}
+
+
+def learn(source, target):
+
+    if os.path.exists("memory.json"):
+
+        with open("memory.json", encoding="utf-8") as f:
+            data = json.load(f)
+
+    else:
+
+        data = {}
+
+    data[source] = target
+
+    with open("memory.json", "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+
+memory = load_memory()
+
+# ===============================
 # BUDOWA SŁOWNIKA
-# =========================
+# ===============================
 
-def build_dictionary():
+@st.cache_data
+def build_dictionary(data):
 
-    pl_ps = {}
-    ps_pl = {}
+    dic = defaultdict(list)
 
-    for e in osnova:
+    for entry in data:
 
-        pl = e.get("polish","").lower()
-        ps = e.get("slovian","")
+        key = entry.get("polish", "").lower().strip()
 
-        if pl:
-            pl_ps[pl] = ps
-            ps_pl[ps] = pl
+        if key:
+            dic[key].append(entry)
 
-    return pl_ps, ps_pl
+    return dic
 
 
-pl_ps, ps_pl = build_dictionary()
+dictionary = build_dictionary(osnova)
 
-
-# =========================
+# ===============================
 # TOKENIZER
-# =========================
+# ===============================
 
 def tokenize(text):
 
     return re.findall(r'\w+|\S', text)
 
 
-# =========================
+# ===============================
 # TŁUMACZENIE PL → PS
-# =========================
+# ===============================
 
 def translate_pl_ps(text):
 
@@ -74,25 +126,34 @@ def translate_pl_ps(text):
 
         key = w.lower()
 
-        if key in pl_ps:
+        if key in memory:
 
-            result.append(pl_ps[key])
+            result.append(memory[key])
+            continue
+
+        if key in dictionary:
+
+            entry = dictionary[key][0]
+            result.append(entry["slovian"])
+            continue
+
+        sim = get_close_matches(key, dictionary.keys(), n=1, cutoff=0.8)
+
+        if sim:
+
+            entry = dictionary[sim[0]][0]
+            result.append(entry["slovian"])
 
         else:
 
-            sim = get_close_matches(key, pl_ps.keys(), 1)
-
-            if sim:
-                result.append(pl_ps[sim[0]])
-            else:
-                result.append("(ne najdeno slova)")
+            result.append("(ne najdeno slova)")
 
     return " ".join(result)
 
 
-# =========================
+# ===============================
 # TŁUMACZENIE PS → PL
-# =========================
+# ===============================
 
 def translate_ps_pl(text):
 
@@ -100,21 +161,27 @@ def translate_ps_pl(text):
 
     result = []
 
+    reverse_dict = {}
+
+    for entry in osnova:
+        reverse_dict[entry["slovian"]] = entry["polish"]
+
     for w in words:
 
-        if w in ps_pl:
-            result.append(ps_pl[w])
+        if w in reverse_dict:
+
+            result.append(reverse_dict[w])
+
         else:
+
             result.append("(nieznane)")
 
     return " ".join(result)
 
 
-# =========================
+# ===============================
 # INTERFEJS
-# =========================
-
-st.set_page_config(layout="wide")
+# ===============================
 
 st.title("Perkladačь slověnьskogo ęzyka")
 
@@ -124,37 +191,71 @@ with col1:
 
     source_lang = st.selectbox(
         "Język źródłowy",
-        ["polski","prasłowiański"]
+        [
+            "polski",
+            "prasłowiański"
+        ]
     )
 
-    text = st.text_area(
+    user_input = st.text_area(
         "Tekst",
-        height=250
+        height=300,
+        placeholder="Np. W miastach jest siła."
     )
+
 
 with col2:
 
     target_lang = st.selectbox(
         "Język docelowy",
-        ["prasłowiański","polski"]
+        [
+            "prasłowiański",
+            "polski"
+        ]
     )
 
-    if text:
+    result = ""
+
+    if user_input:
 
         if source_lang == "polski" and target_lang == "prasłowiański":
 
-            result = translate_pl_ps(text)
+            result = translate_pl_ps(user_input)
 
         elif source_lang == "prasłowiański" and target_lang == "polski":
 
-            result = translate_ps_pl(text)
+            result = translate_ps_pl(user_input)
 
         else:
 
-            result = "Nieobsługiwane"
+            result = "Nieobsługiwane tłumaczenie."
 
-        st.text_area(
-            "Tłumaczenie",
-            value=result,
-            height=250
-        )
+    st.text_area(
+        "Tłumaczenie",
+        value=result,
+        height=300
+    )
+
+
+# ===============================
+# POPRAWIANIE TŁUMACZEŃ
+# ===============================
+
+st.markdown("---")
+st.markdown("### Popraw tłumaczenie (samouczenie)")
+
+correct = st.text_input(
+    "Jeśli tłumaczenie jest złe — wpisz poprawne:"
+)
+
+if st.button("Zapisz poprawkę"):
+
+    if user_input and correct:
+
+        learn(user_input.lower(), correct)
+
+        st.success("Zapisano w memory.json")
+
+    else:
+
+        st.warning("Wpisz tekst i poprawkę.")
