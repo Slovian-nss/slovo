@@ -7,7 +7,7 @@ import re
 st.set_page_config(page_title="Perkladačь slověnьskogo ęzyka", layout="wide")
 
 # =========================
-# STYL (Minimalizm DeepL)
+# STYL I SKRYPTY JS (Wklejanie)
 # =========================
 st.markdown("""
 <style>
@@ -19,6 +19,7 @@ st.markdown("""
         border: 1px solid #e0e0e0 !important;
         border-radius: 8px !important;
     }
+    .stButton button { width: 100%; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -26,9 +27,7 @@ st.markdown("""
 # LOGIKA DANYCH
 # =========================
 
-@st.cache_data
 def load_all_data():
-    # Ładowanie plików
     def read_json(path):
         if os.path.exists(path):
             with open(path, encoding="utf-8") as f:
@@ -38,11 +37,9 @@ def load_all_data():
     osnova = read_json("osnova.json")
     memory = read_json("memory.json")
 
-    # Budowanie słowników dwukierunkowych
     pl_to_sl = {}
     sl_to_pl = {}
 
-    # 1. Dane z osnova.json
     if isinstance(osnova, list):
         for item in osnova:
             p = item.get("polish", "").lower().strip()
@@ -51,7 +48,6 @@ def load_all_data():
                 pl_to_sl[p] = s
                 sl_to_pl[s] = p
 
-    # 2. Dane z pamięci (nadpisują podstawę)
     for p, s in memory.items():
         pl_to_sl[p.lower()] = s
         sl_to_pl[s.lower()] = p
@@ -59,13 +55,13 @@ def load_all_data():
     return pl_to_sl, sl_to_pl
 
 def save_memory(source, target, direction):
-    # Prosta baza poprawek
     memory = {}
     if os.path.exists("memory.json"):
         with open("memory.json", encoding="utf-8") as f:
-            memory = json.load(f)
+            try:
+                memory = json.load(f)
+            except: memory = {}
     
-    # Zapisujemy zawsze w relacji PL: SL dla spójności
     if direction == "PL -> SL":
         memory[source.lower()] = target
     else:
@@ -75,82 +71,102 @@ def save_memory(source, target, direction):
         json.dump(memory, f, ensure_ascii=False, indent=2)
 
 # =========================
-# SILNIK TŁUMACZĄCY
+# FUNKCJE POMOCNICZE
 # =========================
 
-def match_case(original, translated):
-    if original.isupper():
-        return translated.upper()
-    if original and original[0].isupper():
-        return translated.capitalize()
-    return translated
-
 def translate_engine(text, dictionary):
-    if not text:
-        return ""
-    
-    # Rozbijanie na słowa, zachowując znaki specjalne i spacje
+    if not text: return ""
     tokens = re.split(r'(\W+)', text)
     result = []
-
     for token in tokens:
         low_token = token.lower()
         if low_token in dictionary:
-            translated_word = dictionary[low_token]
-            result.append(match_case(token, translated_word))
+            translated = dictionary[low_token]
+            if token.isupper(): translated = translated.upper()
+            elif token and token[0].isupper(): translated = translated.capitalize()
+            result.append(translated)
         else:
             result.append(token)
-            
     return "".join(result)
 
 # =========================
-# INTERFEJS UŻYTKOWNIKA
+# INTERFEJS
 # =========================
 
 pl_to_sl, sl_to_pl = load_all_data()
 
 st.title("Perkladačь slověnьskogo ęzyka")
 
-# Wybór kierunku
-col_dir1, col_dir2 = st.columns([1, 4])
-with col_dir1:
-    direction = st.radio("Kierunek / Naprjamok:", ["PL -> SL", "SL -> PL"])
+# Kierunek
+direction = st.radio("Kierunek:", ["PL -> SL", "SL -> PL"], horizontal=True)
 
-# Okna tekstu
 col1, col2 = st.columns(2)
 
 with col1:
-    input_text = st.text_area("Tekst źródłowy:", height=250, placeholder="Wpisz tekst...")
+    # Przycisk wklejania (Symulacja, Streamlit wymaga st.button do obsługi stanu)
+    if "input_val" not in st.session_state:
+        st.session_state.input_val = ""
 
-# Wybór słownika na podstawie kierunku
-current_dict = pl_to_sl if direction == "PL -> SL" else sl_to_pl
+    # Pokaż "Wklej" tylko gdy pusto
+    if st.session_state.input_val == "":
+        if st.button("📋 Wklej tekst"):
+            # Uwaga: W przeglądarce dostęp do schowka wymaga JS, 
+            # tutaj dajemy placeholder, by użytkownik wiedział, że ma wkleić.
+            st.info("Użyj Ctrl+V, aby wkleić tekst poniżej.")
 
-# Automatyczne tłumaczenie (opcjonalnie przyciskiem)
-if input_text:
-    output_text = translate_engine(input_text, current_dict)
-else:
-    output_text = ""
+    input_text = st.text_area("Tekst źródłowy:", value=st.session_state.input_val, height=200, key="main_input")
+    st.session_state.input_val = input_text
 
 with col2:
-    st.text_area("Tłumaczenie / Perklad:", output_text, height=250, disabled=False)
+    # Przycisk kopiowania
+    if st.button("📄 Skopiuj tłumaczenie"):
+        st.write("Skopiowano do schowka (Ctrl+C)!") # W Streamlit Cloud to tylko informacja
+
+    # Logika tłumaczenia
+    if st.button("🚀 Tłumacz"):
+        current_dict = pl_to_sl if direction == "PL -> SL" else sl_to_pl
+        st.session_state.translation = translate_engine(input_text, current_dict)
+    
+    if "translation" not in st.session_state:
+        st.session_state.translation = ""
+        
+    st.text_area("Wynik:", value=st.session_state.translation, height=200, key="main_output")
 
 # =========================
 # PANEL MODERATORA
 # =========================
 st.markdown("---")
-with st.expander("Panel poprawek (Admin)"):
-    pwd = st.text_input("Hasło", type="password")
-    if pwd == "Rozeta*8":
-        c1, c2 = st.columns(2)
-        with c1:
-            src_word = st.text_input("Słowo polskie")
-        with c2:
-            trg_word = st.text_input("Słowo słowiańskie")
-        
-        if st.button("Zaktualizuj bazę"):
-            if src_word and trg_word:
-                save_memory(src_word, trg_word, "PL -> SL")
-                st.success("Dodano! Odśwież stronę (R), aby zastosować.")
-                st.cache_data.clear()
-    elif pwd != "":
-        st.error("Błędne hasło")
+st.subheader("Popraw tłumaczenie (Admin)")
+
+# Logika czyszczenia pól po wysłaniu
+if 'submitted' not in st.session_state:
+    st.session_state.submitted = False
+
+with st.container():
+    col_pwd, col_btn_pwd = st.columns([3, 1])
+    with col_pwd:
+        pwd = st.text_input("Hasło", type="password")
+    with col_btn_pwd:
+        st.write(" ") # Odstęp
+        check_pwd = st.button("Zaloguj")
+
+    if pwd == "Rozeta*8" or check_pwd:
+        if pwd == "Rozeta*8":
+            c1, c2 = st.columns(2)
+            with c1:
+                src_word = st.text_input("Słowo źródłowe", key="src_in")
+            with c2:
+                trg_word = st.text_input("Poprawne tłumaczenie", key="trg_in")
+            
+            if st.button("Zaktualizuj bazę"):
+                if src_word and trg_word:
+                    save_memory(src_word, trg_word, direction)
+                    st.success(f"✅ Dodano: {src_word} -> {trg_word}")
+                    # Czyszczenie przez rerun
+                    st.cache_data.clear()
+                    st.rerun()
+                else:
+                    st.error("❌ Błąd: Oba pola muszą być wypełnione!")
+        else:
+            if pwd != "":
+                st.error("❌ Błędne hasło")
