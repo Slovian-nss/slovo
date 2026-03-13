@@ -2,63 +2,87 @@ import json
 import os
 import re
 
+
 def load_json(file_name):
-    """Bezpieczne wczytywanie JSON z gwarancją zwrotu słownika."""
+    """Bezpieczne wczytywanie JSON."""
     try:
-        # Ustalenie ścieżki bezwzględnej do folderu ze skryptem
         base_path = os.path.dirname(os.path.abspath(__file__))
         full_path = os.path.join(base_path, file_name)
-        
-        if os.path.exists(full_path):
-            with open(full_path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                return data if isinstance(data, dict) else {}
+
+        if not os.path.exists(full_path):
+            return {}
+
+        with open(full_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        if isinstance(data, dict):
+            return data
+
         return {}
+
     except Exception:
         return {}
 
+
+def translate_word(word, dictionary):
+    """Tłumaczy pojedyncze słowo."""
+    lower = word.lower()
+
+    if lower in dictionary:
+        translated = dictionary[lower]
+
+        if word[0].isupper():
+            translated = translated.capitalize()
+
+        return translated
+
+    return word
+
+
 def translate_text(text, src_lang, tgt_lang):
-    if not text or not text.strip():
+
+    if not text.strip():
         return ""
 
-    # Wczytanie baz - gwarantowane słowniki
-    osnova = load_json('osnova.json')
-    vuzor = load_json('vuzor.json')
+    osnova = load_json("osnova.json")
 
-    if tgt_lang == "sl":
-        if not osnova:
-            return "Błąd: Nie wczytano bazy osnova.json. Sprawdź pliki w repozytorium."
+    if tgt_lang != "sl":
+        return "Tłumaczenie dostępne obecnie tylko na Prasłowiański."
 
-        # Rozbijanie na słowa i znaki interpunkcyjne
-        tokens = re.findall(r"[\w']+|[.,!?;]", text)
-        translated_result = []
+    if not osnova:
+        return "Błąd: Nie wczytano bazy osnova.json."
 
-        for token in tokens:
-            if token in ".,!?;":
-                translated_result.append(token)
-                continue
+    # tokenizacja (obsługuje polskie litery)
+    tokens = re.findall(r"\w+|[^\w\s]", text, re.UNICODE)
 
-            lower_token = token.lower()
-            # Szukanie w słowniku
-            replacement = osnova.get(lower_token)
+    result = []
 
-            if replacement:
-                # Zachowanie wielkości liter
-                if token[0].isupper():
-                    replacement = replacement.capitalize()
-                translated_result.append(replacement)
-            else:
-                # Jeśli nie ma w bazie, zostawiamy oryginał
-                translated_result.append(token)
+    for token in tokens:
 
-        # Składanie tekstu i naprawa spacji przed interpunkcją
-        output = " ".join(translated_result)
-        for char in ".,!?;":
-            output = output.replace(f" {char}", char)
-        
-        return output
+        # interpunkcja
+        if re.match(r"[^\w\s]", token):
+            result.append(token)
+            continue
 
-    return "Tłumaczenie dostępne obecnie tylko na Prasłowiański."
+        translated = translate_word(token, osnova)
+        result.append(translated)
+
+    # składanie zdania
+    output = ""
+    for i, token in enumerate(result):
+
+        if i == 0:
+            output += token
+            continue
+
+        # brak spacji przed interpunkcją
+        if re.match(r"[.,!?;:]", token):
+            output += token
+        else:
+            output += " " + token
+
+    return output
+
 
 def get_languages():
     return {
