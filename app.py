@@ -8,95 +8,103 @@ LANGUAGES = {
 
 st.set_page_config(page_title="Tłumacz", layout="wide")
 
-# --- CSS: ABSOLUTNE WYRÓWNANIE ---
+# --- CSS: PRECYZYJNE WYKOŃCZENIE ---
 st.markdown("""
 <style>
-    /* 1. Przesunięcie nagłówka mocno do góry */
+    /* Podciągnięcie całości do góry */
+    .stApp { margin-top: -50px; }
+    
     .title-text {
         color:#002b49;
         font-weight:800;
         text-align:center;
         font-size:2.2rem;
-        margin-top: -60px !important; 
-        margin-bottom: 30px !important;
+        margin-bottom: 20px !important;
     }
 
-    /* 2. Usuwamy marginesy pod selectboxami i przyciskami, żeby rzędy były blisko siebie */
-    .stSelectbox, .stButton, .stTextArea {
-        margin-bottom: -15px !important;
-    }
-
-    /* 3. Wymuszamy, aby kolumny w rzędzie wyboru języka miały tę samą wysokość i wycentrowanie */
+    /* Wyrównanie pionowe rzędu wyboru języka */
     [data-testid="stHorizontalBlock"] {
         align-items: center !important;
+        gap: 0.5rem !important;
     }
 
-    /* 4. Styl przycisków Kopiuj/Wklej - mniejsze i dopasowane */
+    /* Stylizacja list rozwijanych */
+    div[data-baseweb="select"] {
+        border: 2px solid #2d3748 !important;
+        border-radius: 10px !important;
+    }
+
+    /* Stylizacja przycisków funkcyjnych (Wklej/Kopiuj) */
     .stButton button {
-        background:#002b49;
+        background:#002b49 !important;
         color:white !important;
-        border-radius:6px;
-        height: 38px !important;
-        padding-top: 0px !important;
-        padding-bottom: 0px !important;
-        width: auto !important;
-        min-width: 120px;
+        border-radius:6px !important;
+        height: 32px !important;
+        font-size: 14px !important;
+        padding: 0px 15px !important;
+        width: auto !important; /* Przycisk dopasuje się do napisu */
     }
 
-    /* 5. Przycisk zamiany języków (strzałki) - wycentrowany */
-    .swap-btn-style button {
-        background: #002b49 !important;
+    /* Przycisk zamiany języków (⇄) */
+    .swap-btn-container button {
+        width: 50px !important;
         height: 40px !important;
-        width: 45px !important;
-        min-width: 45px !important;
+        font-size: 20px !important;
         margin-top: 0px !important;
     }
 
-    /* 6. Pola tekstowe */
+    /* Odstępy między rzędami */
+    .row-spacer { margin-top: 15px; }
+
+    /* Pola tekstowe */
     .stTextArea textarea {
         border:2px solid #2d3748 !important;
         border-radius:10px !important;
+        padding: 15px !important;
     }
 </style>
 """, unsafe_allow_html=True)
 
-# --- LOGIKA ---
+# --- LOGIKA SESJI ---
 if "input_text" not in st.session_state: st.session_state.input_text = ""
 if "src_lang" not in st.session_state: st.session_state.src_lang = "pl"
 if "tgt_lang" not in st.session_state: st.session_state.tgt_lang = "sl"
 
-def swap_languages():
+def swap_langs():
     st.session_state.src_lang, st.session_state.tgt_lang = \
         st.session_state.tgt_lang, st.session_state.src_lang
 
-# --- UI ---
+# --- LAYOUT ---
 st.markdown('<h1 class="title-text">Tłumacz Języka Słowiańskiego (Prasłowiańskiego)</h1>', unsafe_allow_html=True)
 
-# RZĄD 1: Wybór języka i zamiana
-col_l, col_s, col_r = st.columns([10, 1.5, 10])
-with col_l:
-    st.selectbox("src", options=list(LANGUAGES.keys()), format_func=lambda x: LANGUAGES[x], key="src_lang", label_visibility="collapsed")
-with col_s:
-    st.markdown('<div class="swap-btn-style">', unsafe_allow_html=True)
-    st.button("⇄", on_click=swap_languages)
+# RZĄD 1: Wybór języka
+c1, c2, c3 = st.columns([10, 1, 10])
+with c1:
+    st.selectbox("z", options=list(LANGUAGES.keys()), format_func=lambda x: LANGUAGES[x], key="src_lang", label_visibility="collapsed")
+with c2:
+    st.markdown('<div class="swap-btn-container">', unsafe_allow_html=True)
+    st.button("⇄", on_click=swap_langs, use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
-with col_r:
-    st.selectbox("tgt", options=list(LANGUAGES.keys()), format_func=lambda x: LANGUAGES[x], key="tgt_lang", label_visibility="collapsed")
+with c3:
+    st.selectbox("na", options=list(LANGUAGES.keys()), format_func=lambda x: LANGUAGES[x], key="tgt_lang", label_visibility="collapsed")
 
-st.markdown("<div style='margin-top: 25px;'></div>", unsafe_allow_html=True) # Precyzyjny odstęp między rzędami
+st.markdown('<div class="row-spacer"></div>', unsafe_allow_html=True)
 
-# RZĄD 2: Kopiuj / Wklej
-btn_l, _, btn_r = st.columns([10, 1.5, 10])
-with btn_l:
+# RZĄD 2: Przyciski Kopiuj/Wklej
+b1, _, b2 = st.columns([10, 1, 10])
+with b1:
     st.button("📋 Wklej tekst")
-with btn_r:
+with b2:
     st.button("📋 Kopiuj wynik")
 
 # RZĄD 3: Pola tekstowe
-t_l, _, t_r = st.columns([10, 1.5, 10])
-with t_l:
-    st.session_state.input_text = st.text_area("in", value=st.session_state.input_text, height=300, label_visibility="collapsed", placeholder="Wpisz tekst...")
-with t_r:
-    # Tu podepnij swoje tłumaczenie
-    wynik = f"Przetłumaczono na {st.session_state.tgt_lang}: {st.session_state.input_text}" if st.session_state.input_text else ""
-    st.text_area("out", value=wynik, height=300, label_visibility="collapsed")
+t1, _, t2 = st.columns([10, 1, 10])
+with t1:
+    st.session_state.input_text = st.text_area("in", value=st.session_state.input_text, height=250, label_visibility="collapsed", placeholder="Wpisz tekst...")
+with t2:
+    # Przykładowe "tłumaczenie" (tu wstaw swoją funkcję)
+    wynik = f"({st.session_state.tgt_lang.upper()}) {st.session_state.input_text}" if st.session_state.input_text else ""
+    st.text_area("out", value=wynik, height=250, label_visibility="collapsed", key="output_area")
+
+st.markdown("---")
+st.caption("Interfejs zoptymalizowany pod kątem estetyki DeepL.")
