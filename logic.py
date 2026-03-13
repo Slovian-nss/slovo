@@ -3,62 +3,62 @@ import os
 import re
 
 def load_json(file_name):
-    """Wczytuje plik JSON z aktualnego katalogu roboczego."""
+    """Wczytuje plik JSON z gwarancją zwrócenia słownika."""
     try:
-        # Streamlit Cloud czasem wymaga pełnej ścieżki
+        # Pobieramy ścieżkę do katalogu, w którym znajduje się logic.py
         base_path = os.path.dirname(__file__)
         full_path = os.path.join(base_path, file_name)
         
         if os.path.exists(full_path):
             with open(full_path, 'r', encoding='utf-8') as f:
-                return json.load(f)
+                data = json.load(f)
+                if data is None:
+                    return {}
+                return data
         return {}
-    except Exception:
+    except Exception as e:
+        # W razie błędu zwracamy pusty słownik, żeby .get() nie wywaliło apki
         return {}
 
 def translate_text(text, src_lang, tgt_lang):
     if not text.strip():
         return ""
 
-    # 1. Wczytanie baz danych
+    # Wczytanie baz - teraz zawsze będą słownikami (pustymi lub nie)
     osnova = load_json('osnova.json')
     vuzor = load_json('vuzor.json')
 
-    # Jeśli baza jest pusta, zwróć informację debugującą
-    if not osnova:
-        return "Błąd: Nie znaleziono pliku osnova.json lub plik jest pusty."
-
-    # 2. Logika dla języka Prasłowiańskiego
     if tgt_lang == "sl":
-        # Rozdzielamy tekst na słowa, zachowując znaki interpunkcyjne
+        # Jeśli osnova jest pusta, wyświetlamy komunikat diagnostyczny
+        if not osnova:
+            return "Błąd: Słownik osnova.json nie został wczytany. Sprawdź czy plik jest w repozytorium."
+
+        # Rozbijanie tekstu na słowa i interpunkcję
         words = re.findall(r"[\w']+|[.,!?;]", text)
         translated_result = []
 
         for word in words:
-            # Sprawdzamy, czy to znak interpunkcyjny
             if word in ".,!?;":
                 translated_result.append(word)
                 continue
 
-            # Szukanie w słowniku (małymi literami)
             word_lower = word.lower()
             
-            # PROSTY MECHANIZM DOPASOWANIA
-            # Zakładamy strukturę osnova.json: {"matka": "mati", "jest": "estъ", "kościół": "crьky"}
+            # Bezpieczne pobieranie ze słownika
             found_word = osnova.get(word_lower)
 
             if found_word:
-                # Zachowanie wielkości liter (jeśli oryginał był z dużej, wynik też)
                 if word[0].isupper():
                     found_word = found_word.capitalize()
                 translated_result.append(found_word)
             else:
-                # Jeśli słowa nie ma w słowniku, zwracamy je w gwiazdkach (do debugowania)
-                translated_result.append(f"*{word}*")
+                translated_result.append(word) # Jeśli nie ma, zostaw oryginał
 
-        # Łączenie słów (poprawka spacji przed interpunkcją)
+        # Składanie zdania
         final_sentence = " ".join(translated_result)
-        final_sentence = final_sentence.replace(" .", ".").replace(" ,", ",").replace(" ?", "?")
+        # Poprawka spacji przed znakami interpunkcyjnymi
+        for char in ".,!?;":
+            final_sentence = final_sentence.replace(f" {char}", char)
         
         return final_sentence
 
