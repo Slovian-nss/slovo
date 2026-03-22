@@ -1,55 +1,74 @@
-def translate_word(self, word):
-    original = word
-    clean_lower = word.lower().strip(".,!?;:()")
+import json
+import os
+import re
 
-    # Wyjątki / stałe tłumaczenia
-    exceptions = {
-        "jest": "estь",
-        "w": "vu",
-        "jestem": "esmь",
-        "jestes": "esi",
-        "są": "sǫtь",
-        "matka": "mati",
-        "matki": "matere",   # lub matь – zależnie od przypadku
-        "ogrodzie": "obgordě",
-        "ogrod": "obgordъ",
-    }
+class SlovianLogic:
+    def __init__(self):
+        self.osnova = self._load_json('osnova.json')
+        self.vuzor = self._load_json('vuzor.json')
+        
+        # Reguły fonetyczne (tzw. Sound Laws) - fundament pod ML
+        self.sound_laws = [
+            (r'ą', 'ǫ'), (r'ę', 'ę'), (r'rz', 'rь'), 
+            (r'sz', 'š'), (r'cz', 'č'), (r'ż', 'ž'),
+            (r'ć', 'cь'), (r'ś', 'sь'), (r'ź', 'zь'),
+            (r'y', 'y'), (r'u', 'u')
+        ]
 
-    if clean_lower in exceptions:
-        translated = exceptions[clean_lower]
-    else:
-        # zwykłe wyszukiwanie w osnova
-        for entry in self.osnova:
-            if entry.get("polish", "").lower() == clean_lower:
-                translated = entry.get("slovian", clean_lower)
-                break
-        else:
-            # fonetyczna rekonstrukcja jako ostatnia deska
-            translated = clean_lower
-            for pl, sl in self.rules.items():
-                translated = translated.replace(pl, sl)
-            if translated and translated[-1] not in "aeiouyęǫьъ":
-                translated += "ъ"
+    def _load_json(self, path):
+        if os.path.exists(path):
+            with open(path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        return {}
 
-    # Przywróć wielkość pierwszej litery jeśli była duża
-    if original and original[0].isupper():
-        translated = translated[0].upper() + translated[1:]
+    def get_form(self, vuzor_id, form_type="m1"):
+        """Pobiera końcówkę z vuzor.json (domyślnie m1 - mianownik)"""
+        pattern = self.vuzor.get(vuzor_id, {})
+        return pattern.get(form_type, "")
 
-    return translated
+    def apply_sound_laws(self, word):
+        """Rekonstrukcja fonetyczna dla słów spoza bazy"""
+        for pattern, replacement in self.sound_laws:
+            word = re.sub(pattern, replacement, word)
+        
+        # Prasłowiański "jer" na końcu, jeśli słowo kończy się spółgłoską
+        if re.search(r'[^aeiouyǫęьъ]$', word):
+            word += "ъ"
+        return word
 
+    def translate_word(self, word):
+        # 1. Standaryzacja
+        w = word.lower().strip(".,!?:;()")
+        if not w: return word
 
-def translate_sentence(self, text):
-    if not text.strip():
-        return ""
+        # 2. Sprawdzenie w bazie osnova.json
+        if w in self.osnova:
+            entry = self.osnova[w]
+            
+            # Jeśli wpis jest słownikiem (ma rdzeń i wzorzec)
+            if isinstance(entry, dict):
+                root = entry.get("osnova", "")
+                v_id = entry.get("vuzor", "")
+                # Tu w przyszłości AI będzie decydować o 'form_type'
+                suffix = self.get_form(v_id, "m1") 
+                return root + suffix
+            
+            # Jeśli wpis to gotowe słowo (string)
+            return entry
 
-    # Rozbijamy zachowując znaki interpunkcyjne
-    tokens = re.findall(r'\w+|[^\w\s]', text)
-    result = []
+        # 3. Jeśli słowa nie ma w bazie - 'inteligentna' rekonstrukcja
+        return self.apply_sound_laws(w)
 
-    for token in tokens:
-        if token.isspace() or re.match(r'^[^\w\s]+$', token):
-            result.append(token)
-        else:
-            result.append(self.translate_word(token))
+    def translate_text(self, text):
+        # Rozbijanie na słowa z zachowaniem interpunkcji (prosty regex)
+        tokens = re.findall(r"[\w]+|[^\s\w]", text)
+        result = []
+        for token in tokens:
+            if token.isalnum():
+                result.append(self.translate_word(token))
+            else:
+                result.append(token)
+        return " ".join(result).replace(" .", ".").replace(" ,", ",")
 
-    return "".join(result).strip()
+# Eksport instancji
+translator_logic = SlovianLogic()
