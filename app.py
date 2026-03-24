@@ -5,11 +5,12 @@ from deep_translator import GoogleTranslator
 
 st.set_page_config(page_title="Perkladačь slověnьskogo ęzyka", layout="centered")
 
+# ================== STYLE ==================
+
 st.markdown("""
 <style>
 .main {background:#0e1117}
 .stTextArea textarea {background:#1a1a1a;color:#dcdcdc}
-button {margin-top:5px}
 </style>
 """, unsafe_allow_html=True)
 
@@ -20,31 +21,37 @@ def load_json(filename):
     try:
         with open(filename, "r", encoding="utf-8") as f:
             return json.load(f)
-    except:
+    except Exception as e:
+        st.error(f"Błąd {filename}: {e}")
         return []
 
 osnova = load_json("osnova.json")
+vuzor = load_json("vuzor.json")
 
-# ================== DICTS ==================
+# ================== BUILD DICT ==================
 
 @st.cache_data
-def build_dict(data):
+def build_dict(osnova, vuzor):
     pl_to_slo = {}
     slo_to_pl = {}
 
-    for entry in data:
-        pol = entry.get("polish", "").lower().strip()
-        slo = entry.get("slovian", "").strip()
+    def process(data):
+        for entry in data:
+            pol = entry.get("polish", "").lower().strip()
+            slo = entry.get("slovian", "").strip()
 
-        if pol and slo:
-            pl_to_slo[pol] = slo
-            slo_to_pl[slo.lower()] = pol
+            if pol and slo:
+                pl_to_slo[pol] = slo
+                slo_to_pl[slo.lower()] = pol
+
+    process(osnova)
+    process(vuzor)
 
     return pl_to_slo, slo_to_pl
 
-pl_to_slo, slo_to_pl = build_dict(osnova)
+pl_to_slo, slo_to_pl = build_dict(osnova, vuzor)
 
-# ================== LOCAL ==================
+# ================== TRANSLATE ==================
 
 def translate_pl_to_slo(text):
     tokens = re.findall(r'\w+|[^\w\s]|\s+', text)
@@ -54,11 +61,11 @@ def translate_pl_to_slo(text):
         if re.match(r'\w+', token):
             lower = token.lower()
 
-            # 1. dokładne dopasowanie
+            # dokładne
             if lower in pl_to_slo:
                 translated = pl_to_slo[lower]
 
-            # 2. prefiks (ratunek)
+            # prefiks
             else:
                 translated = None
                 for k, v in pl_to_slo.items():
@@ -66,11 +73,9 @@ def translate_pl_to_slo(text):
                         translated = v
                         break
 
-                # 3. brak słowa
                 if not translated:
                     translated = f"[{token}]"
 
-            # wielkość liter
             if token.istitle():
                 translated = translated.capitalize()
             elif token.isupper():
@@ -135,13 +140,7 @@ with col2:
 
 user_input = st.text_area("Vupiši tekst:", height=150)
 
-translate_btn = st.button("🔄 Tłumacz")
-
-# ================== LOGIKA ==================
-
-result = ""
-
-if translate_btn and user_input:
+if st.button("🔄 Tłumacz") and user_input:
 
     src = langs[source_lang]
     tgt = langs[target_lang]
@@ -160,8 +159,5 @@ if translate_btn and user_input:
     else:
         result = google_translate(user_input, src, tgt)
 
-# ================== OUTPUT ==================
-
-if result:
     st.markdown("### Vynik perklada:")
     st.success(result)
