@@ -4,7 +4,7 @@ import re
 from deep_translator import GoogleTranslator
 from streamlit_javascript import st_javascript
 
-# ================== 1. DYNAMICZNE POBIERANIE JĘZYKÓW ==================
+# ================== 1. JĘZYKI ==================
 @st.cache_resource
 def get_all_languages():
     try:
@@ -27,34 +27,35 @@ UI_TRANSLATIONS = {
 }
 
 if st_lang:
-    detected_code = st_lang[:2].lower()
-    lang_code = detected_code if detected_code in UI_TRANSLATIONS else "en"
+    detected = st_lang[:2].lower()
+    lang_code = detected if detected in UI_TRANSLATIONS else "en"
 else:
-    lang_code = "pl"
+    lang_code = "en"
+
 ui = UI_TRANSLATIONS[lang_code]
 
 # ================== 3. PERSISTENCJA ==================
 def get_persisted_target():
-    code = st_javascript("""
-        let val = localStorage.getItem('slovo_target_lang');
-        return val !== null ? val : 'slo';
-    """)
+    code = st_javascript("return localStorage.getItem('slovo_target_lang') || 'slo';")
     return code if code in ALL_OPTIONS.values() else 'slo'
 
 def save_target(lang_code):
     st_javascript(f"localStorage.setItem('slovo_target_lang', '{lang_code}');")
 
-# ================== 4. KONFIGURACJA ==================
+# ================== 4. KONFIGURACJA + CSS ==================
 st.set_page_config(page_title=ui["title"], layout="wide")
+
 st.markdown("""
     <style>
     .main { max-width: 900px; margin: 0 auto; }
     .stTextArea textarea { font-size: 1.1rem; }
-    div[data-testid="column"] > div { gap: 0.5rem; }
+    div[data-testid="stHorizontalBlock"] > div:nth-child(1) { flex: 1; }
+    div[data-testid="stHorizontalBlock"] > div:nth-child(2) { flex: 1; }
+    label { font-weight: 500 !important; }
     </style>
     """, unsafe_allow_html=True)
 
-# ================== 5. LOGIKA SŁOWIAŃSKA (bez zmian) ==================
+# ================== 5. LOGIKA TŁUMACZENIA (bez zmian) ==================
 @st.cache_data
 def load_json_safe(filename):
     try:
@@ -114,7 +115,7 @@ with col2:
     try:
         default_idx = list(ALL_OPTIONS.values()).index(persisted)
     except ValueError:
-        default_idx = list(ALL_OPTIONS.values()).index("slo")
+        default_idx = 1
     st.selectbox(ui["to"], list(ALL_OPTIONS.keys()), index=default_idx, key="target_lang")
 
 if "target_lang" in st.session_state:
