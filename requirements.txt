@@ -1,3 +1,4 @@
-streamlit
+# Biblioteki niezbędne dla silnika przetwarzania danych w GitHub Actions
+# Usunięto streamlit i streamlit-javascript, ponieważ interfejs jest teraz w HTML/JS
+
 deep-translator
-streamlit-javascript
