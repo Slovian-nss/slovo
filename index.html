@@ -35,10 +35,10 @@
 </head>
 <body>
 <div class="app-container">
-    <h1 id="ui-title">Slovo Tłumacz</h1>
+    <h1>Slovo Tłumacz</h1>
     <div class="controls">
         <div class="field-group">
-            <label id="ui-label-from">Z języka:</label>
+            <label>Z języka:</label>
             <div class="lang-combobox">
                 <input type="text" id="srcDisplay" class="lang-input" placeholder="Szukaj języka..." onfocus="showDropdown('src')" oninput="filterDropdown('src')">
                 <input type="hidden" id="srcLang">
@@ -47,7 +47,7 @@
         </div>
         <button class="swap-btn" onclick="swapLanguages()">⇄</button>
         <div class="field-group">
-            <label id="ui-label-to">Na język:</label>
+            <label>Na język:</label>
             <div class="lang-combobox">
                 <input type="text" id="tgtDisplay" class="lang-input" placeholder="Szukaj języka..." onfocus="showDropdown('tgt')" oninput="filterDropdown('tgt')">
                 <input type="hidden" id="tgtLang">
@@ -55,12 +55,12 @@
             </div>
         </div>
     </div>
-    <div class="google-info">🔗 Using Google Translate API + Słowniki</div>
+    <div class="google-info">🔗 Google Translate + Słowniki (PL jako most)</div>
     <textarea id="userInput" placeholder="Wpisz tekst..."></textarea>
     <div class="action-bar">
-        <button class="icon-btn" onclick="pasteText()">📋 <span id="ui-paste">Wklej</span></button>
-        <button class="icon-btn" onclick="clearText()">🗑️ <span id="ui-clear">Usuń</span></button>
-        <button class="icon-btn" onclick="copyText()" style="margin-left: auto;">✂️ <span id="ui-copy">Kopiuj</span></button>
+        <button class="icon-btn" onclick="pasteText()">📋 <span>Wklej</span></button>
+        <button class="icon-btn" onclick="clearText()">🗑️ <span>Usuń</span></button>
+        <button class="icon-btn" onclick="copyText()" style="margin-left: auto;">✂️ <span>Kopiuj</span></button>
     </div>
     <div id="resultOutput" class="result-display"></div>
     <div class="status-bar">
@@ -84,18 +84,17 @@
     function populateDropdowns() {
         const ulSrc = document.getElementById('srcOptions');
         const ulTgt = document.getElementById('tgtOptions');
-        ulSrc.innerHTML = ''; 
-        ulTgt.innerHTML = '';
+        ulSrc.innerHTML = ''; ulTgt.innerHTML = '';
         languageData.forEach(l => {
-            const liSrc = document.createElement('li'); 
-            liSrc.textContent = l.pl;
-            liSrc.onclick = () => selectLanguage('src', l.code, l.pl);
-            ulSrc.appendChild(liSrc);
+            const li = document.createElement('li');
+            li.textContent = l.pl;
+            li.onclick = () => selectLanguage('src', l.code, l.pl);
+            ulSrc.appendChild(li);
 
-            const liTgt = document.createElement('li'); 
-            liTgt.textContent = l.pl;
-            liTgt.onclick = () => selectLanguage('tgt', l.code, l.pl);
-            ulTgt.appendChild(liTgt);
+            const li2 = document.createElement('li');
+            li2.textContent = l.pl;
+            li2.onclick = () => selectLanguage('tgt', l.code, l.pl);
+            ulTgt.appendChild(li2);
         });
     }
 
@@ -103,7 +102,6 @@
         document.getElementById(prefix + 'Lang').value = code;
         document.getElementById(prefix + 'Display').value = name;
         hideAllDropdowns();
-        localStorage.setItem(prefix + 'Lang', code);
         translate();
     }
 
@@ -119,33 +117,29 @@
 
     function filterDropdown(prefix) {
         const val = document.getElementById(prefix + 'Display').value.toLowerCase().trim();
-        const items = document.getElementById(prefix + 'Options').children;
-        Array.from(items).forEach(li => {
+        Array.from(document.getElementById(prefix + 'Options').children).forEach(li => {
             li.style.display = li.textContent.toLowerCase().includes(val) ? '' : 'none';
         });
     }
 
     async function loadDictionaries() {
         try {
-            const [r1, r2] = await Promise.all([
-                fetch('osnova.json'),  // <-- zmienione
-                fetch('vuzor.json')    // <-- zmienione
-            ]);
+            const [r1, r2] = await Promise.all([fetch('osnova.json'), fetch('vuzor.json')]);
             plToSlo = await r1.json();
             sloToPl = await r2.json();
             document.getElementById('dbStatus').textContent = "Słowniki załadowane";
         } catch (e) {
-            document.getElementById('dbStatus').textContent = "Błąd słowników (CORS)";
+            document.getElementById('dbStatus').textContent = "Błąd słowników";
         }
     }
 
     function dictReplace(text, dict) {
         if (!dict || Object.keys(dict).length === 0) return text;
-        const sortedKeys = Object.keys(dict).sort((a, b) => b.length - a.length);
+        const sorted = Object.keys(dict).sort((a,b) => b.length - a.length);
         let result = text;
-        sortedKeys.forEach(key => {
-            const regex = new RegExp('\\b' + key.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&') + '\\b', 'gi');
-            result = result.replace(regex, dict[key]);
+        sorted.forEach(key => {
+            const re = new RegExp('\\b' + key.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&') + '\\b', 'gi');
+            result = result.replace(re, dict[key]);
         });
         return result;
     }
@@ -156,50 +150,47 @@
             const res = await fetch(url);
             const data = await res.json();
             return data[0].map(x => x[0]).join('');
-        } catch (e) { 
-            return text; 
-        }
+        } catch (e) { return text; }
     }
 
     async function translate() {
         const text = document.getElementById('userInput').value.trim();
+        if (!text) {
+            document.getElementById('resultOutput').innerText = "";
+            return;
+        }
         const src = document.getElementById('srcLang').value || 'en';
         const tgt = document.getElementById('tgtLang').value || 'slo';
         const out = document.getElementById('resultOutput');
-        if (!text) { 
-            out.innerText = ""; 
-            return; 
-        }
-        let finalResult = "";
+
+        let result = "";
         try {
-            if (src === 'pl' && tgt === 'slo') {
-                finalResult = dictReplace(text, plToSlo);
-            } else if (src === 'slo' && tgt === 'pl') {
-                finalResult = dictReplace(text, sloToPl);
-            } else if (tgt === 'slo') {
-                const bridge = await google(text, src, 'pl');
-                finalResult = dictReplace(bridge, plToSlo);
+            if (tgt === 'slo') {
+                // Angielski → Polski (Google) → Słowiański (słownik)
+                const toPl = (src === 'pl') ? text : await google(text, src, 'pl');
+                result = dictReplace(toPl, plToSlo);
             } else if (src === 'slo') {
-                const bridge = dictReplace(text, sloToPl);
-                finalResult = await google(bridge, 'pl', tgt);
+                // Słowiański → Polski (słownik) → Cel (Google)
+                const toPl = dictReplace(text, sloToPl);
+                result = (tgt === 'pl') ? toPl : await google(toPl, 'pl', tgt);
             } else {
-                finalResult = await google(text, src, tgt);
+                result = await google(text, src, tgt);
             }
-            out.innerText = finalResult || text;
+            out.innerText = result || text;
         } catch (e) {
             out.innerText = "Błąd tłumaczenia";
         }
     }
 
     function swapLanguages() {
-        const sC = document.getElementById('srcLang').value;
-        const tC = document.getElementById('tgtLang').value;
-        const sD = document.getElementById('srcDisplay').value;
-        const tD = document.getElementById('tgtDisplay').value;
-        document.getElementById('srcLang').value = tC;
-        document.getElementById('tgtLang').value = sC;
-        document.getElementById('srcDisplay').value = tD;
-        document.getElementById('tgtDisplay').value = sD;
+        const sLang = document.getElementById('srcLang').value;
+        const tLang = document.getElementById('tgtLang').value;
+        const sDisp = document.getElementById('srcDisplay').value;
+        const tDisp = document.getElementById('tgtDisplay').value;
+        document.getElementById('srcLang').value = tLang;
+        document.getElementById('tgtLang').value = sLang;
+        document.getElementById('srcDisplay').value = tDisp;
+        document.getElementById('tgtDisplay').value = sDisp;
         translate();
     }
 
@@ -223,27 +214,21 @@
 
     function debounce(fn, ms) {
         let t;
-        return () => {
-            clearTimeout(t);
-            t = setTimeout(fn, ms);
-        };
+        return () => { clearTimeout(t); t = setTimeout(fn, ms); };
     }
 
     async function init() {
         populateDropdowns();
-        const sL = localStorage.getItem('srcLang') || 'en';
-        const tL = localStorage.getItem('tgtLang') || 'slo';
-        const srcObj = languageData.find(x => x.code === sL) || languageData[0];
-        const tgtObj = languageData.find(x => x.code === tL) || languageData[2];
-        document.getElementById('srcLang').value = srcObj.code;
-        document.getElementById('srcDisplay').value = srcObj.pl;
-        document.getElementById('tgtLang').value = tgtObj.code;
-        document.getElementById('tgtDisplay').value = tgtObj.pl;
+        document.getElementById('srcLang').value = 'en';
+        document.getElementById('srcDisplay').value = 'Angielski';
+        document.getElementById('tgtLang').value = 'slo';
+        document.getElementById('tgtDisplay').value = 'Słowiański';
         await loadDictionaries();
-        document.getElementById('userInput').addEventListener('input', debounce(translate, 400));
-        document.addEventListener('click', (e) => {
+        document.getElementById('userInput').addEventListener('input', debounce(translate, 300));
+        document.addEventListener('click', e => {
             if (!e.target.closest('.lang-combobox')) hideAllDropdowns();
         });
+        // Test: wpisz "mother"
     }
 
     window.onload = init;
