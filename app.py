@@ -1,26 +1,35 @@
 import json
 import os
 
-def optimize_dictionary():
+def clean_and_learn():
     files = ['osnova.json', 'vuzor.json']
-    combined_data = []
+    all_entries = []
 
     for file in files:
         if os.path.exists(file):
             with open(file, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                combined_data.extend(data)
+                try:
+                    data = json.load(f)
+                    all_entries.extend(data)
+                except:
+                    continue
 
-    # Przykład "nauki": usuwanie duplikatów i sortowanie alfabetyczne
-    unique_data = {item['polish'].lower(): item['slovian'] for item in combined_data if 'polish' in item}
-    
-    # Zapisujemy "wyczyszczony" słownik do pliku, który odczyta index.html
-    final_list = [{"polish": k, "slovian": v} for k, v in sorted(unique_data.items())]
-    
-    with open('processed_dict.json', 'w', encoding='utf-8') as f:
-        json.dump(final_list, f, ensure_ascii=False, indent=2)
-    
-    print(f"Przetworzono {len(final_list)} słów.")
+    # Usuwanie duplikatów (klucz: język polski)
+    unique_dict = {}
+    for entry in all_entries:
+        p = entry.get('polish', '').lower().strip()
+        s = entry.get('slovian', '').strip()
+        if p and s:
+            unique_dict[p] = s
+
+    # Sortowanie alfabetyczne dla porządku
+    sorted_data = [{"polish": k, "slovian": v} for k, v in sorted(unique_dict.items())]
+
+    # Zapisanie "nauczonego" i czystego słownika
+    with open('osnova.json', 'w', encoding='utf-8') as f:
+        json.dump(sorted_data, f, ensure_ascii=False, indent=2)
+
+    print(f"Sukces: Słownik zaktualizowany. Liczba słów: {len(sorted_data)}")
 
 if __name__ == "__main__":
-    optimize_dictionary()
+    clean_and_learn()
