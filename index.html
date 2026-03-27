@@ -1,237 +1,117 @@
 <!DOCTYPE html>
 <html lang="pl">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Slovo Translator v4.0</title>
-    <style>
-        :root { --primary: #007bff; --bg: #f0f2f5; --card: #ffffff; --text: #333; }
-        * { box-sizing: border-box; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 10px; display: flex; justify-content: center; min-height: 100vh; }
-        .app-container { background: var(--card); padding: 25px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); width: 100%; max-width: 900px; align-self: center; }
-        h1 { text-align: center; color: var(--primary); margin: 0 0 20px 0; font-size: 26px; font-weight: 800; }
-        .controls { display: flex; align-items: flex-end; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; }
-        .field-group { flex: 1; min-width: 200px; display: flex; flex-direction: column; }
-        label { margin-bottom: 5px; font-weight: 600; font-size: 13px; color: #666; }
-        .lang-combobox { position: relative; width: 100%; }
-        .lang-input { width: 100%; padding: 12px 40px 12px 12px; border: 2px solid #eef0f2; border-radius: 12px; font-size: 16px; background: #fff; color: #333; }
-        .lang-input:focus { outline: none; border-color: var(--primary); }
-        .dropdown { position: absolute; top: 100%; left: 0; right: 0; background: #fff; border: 2px solid #eef0f2; border-radius: 12px; max-height: 320px; overflow-y: auto; z-index: 100; display: none; box-shadow: 0 10px 25px rgba(0,0,0,0.15); margin-top: 4px; }
-        .dropdown.show { display: block; }
-        .dropdown ul { list-style: none; padding: 4px 0; margin: 0; }
-        .dropdown li { padding: 10px 16px; cursor: pointer; font-size: 16px; }
-        .dropdown li:hover { background: #f0f7ff; }
-        textarea { width: 100%; padding: 12px; border: 2px solid #eef0f2; border-radius: 12px; font-size: 16px; height: 180px; resize: none; line-height: 1.5; margin-top: 10px; }
-        .action-bar { display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
-        .icon-btn { background: #fff; border: 2px solid #eef0f2; border-radius: 10px; padding: 10px 16px; cursor: pointer; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px; transition: 0.2s; }
-        .icon-btn:hover { border-color: var(--primary); background: #f0f7ff; }
-        .result-display { padding: 20px; background: #f8f9fa; border-radius: 12px; border-left: 6px solid var(--primary); min-height: 120px; font-size: 19px; white-space: pre-wrap; margin-top: 15px; color: #111; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02); }
-        .status-bar { display: flex; justify-content: space-between; margin-top: 20px; font-size: 11px; color: #aaa; border-top: 1px solid #eee; padding-top: 10px; }
-        .swap-btn { background: #f8f9fa; border: 2px solid #eef0f2; border-radius: 50%; width: 50px; height: 50px; cursor: pointer; display: flex; align-items: center; justify-content: center; margin-bottom: 4px; transition: 0.3s; font-size: 26px; }
-        .swap-btn:hover { border-color: var(--primary); color: var(--primary); transform: rotate(180deg); }
-        .google-info { margin: 8px 0; padding: 6px 12px; background: #f0f7ff; border-radius: 8px; font-size: 13px; color: #007bff; text-align: center; font-weight: 600; }
-        @media (max-width: 600px) { .controls { flex-direction: column; } .swap-btn { transform: rotate(90deg); align-self: center; } }
-    </style>
+  <meta charset="UTF-8">
+  <title>Slovian Translator</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+    }
+
+    .container {
+      background: #1e293b;
+      padding: 30px;
+      border-radius: 16px;
+      width: 420px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    input, select, button {
+      width: 100%;
+      padding: 10px;
+      margin: 8px 0;
+      border-radius: 8px;
+      border: none;
+      font-size: 16px;
+    }
+
+    input, select {
+      background: #334155;
+      color: white;
+    }
+
+    button {
+      background: #22c55e;
+      color: black;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #16a34a;
+    }
+
+    .result {
+      margin-top: 20px;
+      padding: 15px;
+      background: #020617;
+      border-radius: 10px;
+      text-align: center;
+      font-size: 20px;
+      min-height: 40px;
+    }
+
+    .direction {
+      display: flex;
+      gap: 10px;
+    }
+  </style>
 </head>
 <body>
-<div class="app-container">
-    <h1>Slovo Tłumacz</h1>
-    <div class="controls">
-        <div class="field-group">
-            <label>Z języka:</label>
-            <div class="lang-combobox">
-                <input type="text" id="srcDisplay" class="lang-input" placeholder="Szukaj języka..." onfocus="showDropdown('src')" oninput="filterDropdown('src')">
-                <input type="hidden" id="srcLang">
-                <div id="srcDropdown" class="dropdown"><ul id="srcOptions"></ul></div>
-            </div>
-        </div>
-        <button class="swap-btn" onclick="swapLanguages()">⇄</button>
-        <div class="field-group">
-            <label>Na język:</label>
-            <div class="lang-combobox">
-                <input type="text" id="tgtDisplay" class="lang-input" placeholder="Szukaj języka..." onfocus="showDropdown('tgt')" oninput="filterDropdown('tgt')">
-                <input type="hidden" id="tgtLang">
-                <div id="tgtDropdown" class="dropdown"><ul id="tgtOptions"></ul></div>
-            </div>
-        </div>
-    </div>
-    <div class="google-info">🔗 Google Translate + Słowniki (PL jako most)</div>
-    <textarea id="userInput" placeholder="Wpisz tekst..."></textarea>
-    <div class="action-bar">
-        <button class="icon-btn" onclick="pasteText()">📋 <span>Wklej</span></button>
-        <button class="icon-btn" onclick="clearText()">🗑️ <span>Usuń</span></button>
-        <button class="icon-btn" onclick="copyText()" style="margin-left: auto;">✂️ <span>Kopiuj</span></button>
-    </div>
-    <div id="resultOutput" class="result-display"></div>
-    <div class="status-bar">
-        <div id="dbStatus">Ładowanie słowników...</div>
-        <div>Slovo Engine v4.0</div>
-    </div>
+
+<div class="container">
+  <h1>Slovian Translator</h1>
+
+  <div class="direction">
+    <select id="direction">
+      <option value="pl-sl">Polski → Slovian</option>
+      <option value="sl-pl">Slovian → Polski</option>
+    </select>
+  </div>
+
+  <input type="text" id="inputText" placeholder="Wpisz słowo..." />
+
+  <button onclick="translate()">Tłumacz</button>
+
+  <div class="result" id="result"></div>
 </div>
+
 <script>
-    let plToSlo = {}, sloToPl = {};
+async function translate() {
+  const text = document.getElementById("inputText").value;
+  const direction = document.getElementById("direction").value;
 
-    const languageData = [
-        { code: 'en', pl: 'Angielski' },
-        { code: 'pl', pl: 'Polski' },
-        { code: 'slo', pl: 'Słowiański' },
-        { code: 'de', pl: 'Niemiecki' },
-        { code: 'fr', pl: 'Francuski' },
-        { code: 'ru', pl: 'Rosyjski' },
-        { code: 'es', pl: 'Hiszpański' }
-    ];
+  if (!text) return;
 
-    function populateDropdowns() {
-        const ulSrc = document.getElementById('srcOptions');
-        const ulTgt = document.getElementById('tgtOptions');
-        ulSrc.innerHTML = ''; ulTgt.innerHTML = '';
-        languageData.forEach(l => {
-            const li = document.createElement('li');
-            li.textContent = l.pl;
-            li.onclick = () => selectLanguage('src', l.code, l.pl);
-            ulSrc.appendChild(li);
+  try {
+    const response = await fetch(`/translate?word=${encodeURIComponent(text)}&dir=${direction}`);
+    const data = await response.text();
 
-            const li2 = document.createElement('li');
-            li2.textContent = l.pl;
-            li2.onclick = () => selectLanguage('tgt', l.code, l.pl);
-            ulTgt.appendChild(li2);
-        });
-    }
+    document.getElementById("result").innerText = data;
+  } catch (e) {
+    document.getElementById("result").innerText = "Błąd połączenia z backendem";
+  }
+}
 
-    function selectLanguage(prefix, code, name) {
-        document.getElementById(prefix + 'Lang').value = code;
-        document.getElementById(prefix + 'Display').value = name;
-        hideAllDropdowns();
-        translate();
-    }
-
-    function showDropdown(prefix) {
-        hideAllDropdowns();
-        document.getElementById(prefix + 'Dropdown').classList.add('show');
-        filterDropdown(prefix);
-    }
-
-    function hideAllDropdowns() {
-        document.querySelectorAll('.dropdown').forEach(d => d.classList.remove('show'));
-    }
-
-    function filterDropdown(prefix) {
-        const val = document.getElementById(prefix + 'Display').value.toLowerCase().trim();
-        Array.from(document.getElementById(prefix + 'Options').children).forEach(li => {
-            li.style.display = li.textContent.toLowerCase().includes(val) ? '' : 'none';
-        });
-    }
-
-    async function loadDictionaries() {
-        try {
-            const [r1, r2] = await Promise.all([fetch('osnova.json'), fetch('vuzor.json')]);
-            plToSlo = await r1.json();
-            sloToPl = await r2.json();
-            document.getElementById('dbStatus').textContent = "Słowniki załadowane";
-        } catch (e) {
-            document.getElementById('dbStatus').textContent = "Błąd słowników";
-        }
-    }
-
-    function dictReplace(text, dict) {
-        if (!dict || Object.keys(dict).length === 0) return text;
-        const sorted = Object.keys(dict).sort((a,b) => b.length - a.length);
-        let result = text;
-        sorted.forEach(key => {
-            const re = new RegExp('\\b' + key.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&') + '\\b', 'gi');
-            result = result.replace(re, dict[key]);
-        });
-        return result;
-    }
-
-    async function google(text, s, t) {
-        try {
-            const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${s}&tl=${t}&dt=t&q=${encodeURIComponent(text)}`;
-            const res = await fetch(url);
-            const data = await res.json();
-            return data[0].map(x => x[0]).join('');
-        } catch (e) { return text; }
-    }
-
-    async function translate() {
-        const text = document.getElementById('userInput').value.trim();
-        if (!text) {
-            document.getElementById('resultOutput').innerText = "";
-            return;
-        }
-        const src = document.getElementById('srcLang').value || 'en';
-        const tgt = document.getElementById('tgtLang').value || 'slo';
-        const out = document.getElementById('resultOutput');
-
-        let result = "";
-        try {
-            if (tgt === 'slo') {
-                // Angielski → Polski (Google) → Słowiański (słownik)
-                const toPl = (src === 'pl') ? text : await google(text, src, 'pl');
-                result = dictReplace(toPl, plToSlo);
-            } else if (src === 'slo') {
-                // Słowiański → Polski (słownik) → Cel (Google)
-                const toPl = dictReplace(text, sloToPl);
-                result = (tgt === 'pl') ? toPl : await google(toPl, 'pl', tgt);
-            } else {
-                result = await google(text, src, tgt);
-            }
-            out.innerText = result || text;
-        } catch (e) {
-            out.innerText = "Błąd tłumaczenia";
-        }
-    }
-
-    function swapLanguages() {
-        const sLang = document.getElementById('srcLang').value;
-        const tLang = document.getElementById('tgtLang').value;
-        const sDisp = document.getElementById('srcDisplay').value;
-        const tDisp = document.getElementById('tgtDisplay').value;
-        document.getElementById('srcLang').value = tLang;
-        document.getElementById('tgtLang').value = sLang;
-        document.getElementById('srcDisplay').value = tDisp;
-        document.getElementById('tgtDisplay').value = sDisp;
-        translate();
-    }
-
-    function copyText() {
-        const text = document.getElementById('resultOutput').innerText;
-        if (text) navigator.clipboard.writeText(text);
-    }
-
-    function clearText() {
-        document.getElementById('userInput').value = '';
-        document.getElementById('resultOutput').innerText = '';
-    }
-
-    async function pasteText() {
-        try {
-            const text = await navigator.clipboard.readText();
-            document.getElementById('userInput').value = text;
-            translate();
-        } catch(e) {}
-    }
-
-    function debounce(fn, ms) {
-        let t;
-        return () => { clearTimeout(t); t = setTimeout(fn, ms); };
-    }
-
-    async function init() {
-        populateDropdowns();
-        document.getElementById('srcLang').value = 'en';
-        document.getElementById('srcDisplay').value = 'Angielski';
-        document.getElementById('tgtLang').value = 'slo';
-        document.getElementById('tgtDisplay').value = 'Słowiański';
-        await loadDictionaries();
-        document.getElementById('userInput').addEventListener('input', debounce(translate, 300));
-        document.addEventListener('click', e => {
-            if (!e.target.closest('.lang-combobox')) hideAllDropdowns();
-        });
-        // Test: wpisz "mother"
-    }
-
-    window.onload = init;
+// Enter = translate
+document.getElementById("inputText").addEventListener("keypress", function(e) {
+  if (e.key === "Enter") {
+    translate();
+  }
+});
 </script>
+
 </body>
 </html>
