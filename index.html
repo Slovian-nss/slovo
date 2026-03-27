@@ -196,7 +196,18 @@
     }
 
     async function loadDictionaries() {
-        document.getElementById('dbStatus').textContent = 'Google Translate API';
+        try {
+            const [plRes, sloRes] = await Promise.all([
+                fetch('plToSlo.json'),
+                fetch('sloToPl.json')
+            ]);
+            plToSlo = await plRes.json();
+            sloToPl = await sloRes.json();
+            document.getElementById('dbStatus').textContent = 'Google Translate API + Dictionaries';
+        } catch (e) {
+            console.warn('Dictionaries not loaded', e);
+            document.getElementById('dbStatus').textContent = 'Google Translate API';
+        }
     }
 
     async function translate() {
