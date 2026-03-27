@@ -35,12 +35,12 @@
 </head>
 <body>
 <div class="app-container">
-    <h1 id="ui-title">Slovo Translator</h1>
+    <h1 id="ui-title">Slovo Tłumacz</h1>
     <div class="controls">
         <div class="field-group">
             <label id="ui-label-from">Z języka:</label>
             <div class="lang-combobox">
-                <input type="text" id="srcDisplay" class="lang-input" placeholder="Szukaj..." onfocus="showDropdown('src')" oninput="filterDropdown('src')">
+                <input type="text" id="srcDisplay" class="lang-input" placeholder="Szukaj języka..." onfocus="showDropdown('src')" oninput="filterDropdown('src')">
                 <input type="hidden" id="srcLang">
                 <div id="srcDropdown" class="dropdown"><ul id="srcOptions"></ul></div>
             </div>
@@ -49,13 +49,13 @@
         <div class="field-group">
             <label id="ui-label-to">Na język:</label>
             <div class="lang-combobox">
-                <input type="text" id="tgtDisplay" class="lang-input" placeholder="Szukaj..." onfocus="showDropdown('tgt')" oninput="filterDropdown('tgt')">
+                <input type="text" id="tgtDisplay" class="lang-input" placeholder="Szukaj języka..." onfocus="showDropdown('tgt')" oninput="filterDropdown('tgt')">
                 <input type="hidden" id="tgtLang">
                 <div id="tgtDropdown" class="dropdown"><ul id="tgtOptions"></ul></div>
             </div>
         </div>
     </div>
-    <div class="google-info">🔗 Bridge: Polish Language (Required for Slovo)</div>
+    <div class="google-info">🔗 Using Google Translate API + Słowniki</div>
     <textarea id="userInput" placeholder="Wpisz tekst..."></textarea>
     <div class="action-bar">
         <button class="icon-btn" onclick="pasteText()">📋 <span id="ui-paste">Wklej</span></button>
@@ -64,13 +64,13 @@
     </div>
     <div id="resultOutput" class="result-display"></div>
     <div class="status-bar">
-        <div id="dbStatus">Ładowanie słowników...</div>
+        <div id="dbStatus">Ładowanie...</div>
         <div>Slovo Engine v4.0</div>
     </div>
 </div>
-
 <script>
     let plToSlo = {}, sloToPl = {};
+
     const languageData = [
         { code: 'en', pl: 'Angielski', en: 'English', slo: 'Angolsky' },
         { code: 'pl', pl: 'Polski', en: 'Polish', slo: 'Polsky' },
@@ -79,35 +79,22 @@
         { code: 'fr', pl: 'Francuski', en: 'French', slo: 'Fransky' },
         { code: 'ru', pl: 'Rosyjski', en: 'Russian', slo: 'Russky' },
         { code: 'es', pl: 'Hiszpański', en: 'Spanish', slo: 'Spansky' }
-        // Możesz dopisać resztę kodów tutaj...
     ];
 
-    const uiTranslations = {
-        pl: { title: "🌐 Slovo Tłumacz", from: "Z języka:", to: "Na język:", paste: "Wklej", clear: "Usuń", copy: "Kopiuj", placeholder: "Wpisz tekst...", search: "Szukaj..." },
-        en: { title: "🌐 Slovo Translator", from: "From:", to: "To:", paste: "Paste", clear: "Clear", copy: "Copy", placeholder: "Type here...", search: "Search..." }
-    };
-
-    function applyUI(lang) {
-        const t = uiTranslations[lang] || uiTranslations.en;
-        document.getElementById('ui-title').textContent = t.title;
-        document.getElementById('ui-label-from').textContent = t.from;
-        document.getElementById('ui-label-to').textContent = t.to;
-        document.getElementById('ui-paste').textContent = t.paste;
-        document.getElementById('ui-clear').textContent = t.clear;
-        document.getElementById('ui-copy').textContent = t.copy;
-        document.getElementById('userInput').placeholder = t.placeholder;
-    }
-
-    function populateDropdowns(uiLang) {
+    function populateDropdowns() {
         const ulSrc = document.getElementById('srcOptions');
         const ulTgt = document.getElementById('tgtOptions');
-        ulSrc.innerHTML = ''; ulTgt.innerHTML = '';
+        ulSrc.innerHTML = ''; 
+        ulTgt.innerHTML = '';
         languageData.forEach(l => {
-            const name = l[uiLang] || l.en;
-            const liSrc = document.createElement('li'); liSrc.textContent = name;
+            const name = l.pl;
+            const liSrc = document.createElement('li'); 
+            liSrc.textContent = name;
             liSrc.onclick = () => selectLanguage('src', l.code, name);
             ulSrc.appendChild(liSrc);
-            const liTgt = document.createElement('li'); liTgt.textContent = name;
+
+            const liTgt = document.createElement('li'); 
+            liTgt.textContent = name;
             liTgt.onclick = () => selectLanguage('tgt', l.code, name);
             ulTgt.appendChild(liTgt);
         });
@@ -121,27 +108,40 @@
         translate();
     }
 
-    function showDropdown(prefix) { hideAllDropdowns(); document.getElementById(prefix + 'Dropdown').classList.add('show'); }
-    function hideAllDropdowns() { document.querySelectorAll('.dropdown').forEach(d => d.classList.remove('show')); }
+    function showDropdown(prefix) {
+        hideAllDropdowns();
+        document.getElementById(prefix + 'Dropdown').classList.add('show');
+        filterDropdown(prefix);
+    }
+
+    function hideAllDropdowns() {
+        document.querySelectorAll('.dropdown').forEach(d => d.classList.remove('show'));
+    }
+
     function filterDropdown(prefix) {
-        const val = document.getElementById(prefix + 'Display').value.toLowerCase();
+        const val = document.getElementById(prefix + 'Display').value.toLowerCase().trim();
         const items = document.getElementById(prefix + 'Options').children;
-        Array.from(items).forEach(li => li.style.display = li.textContent.toLowerCase().includes(val) ? '' : 'none');
+        Array.from(items).forEach(li => {
+            li.style.display = li.textContent.toLowerCase().includes(val) ? '' : 'none';
+        });
     }
 
     async function loadDictionaries() {
         try {
-            const [r1, r2] = await Promise.all([fetch('plToSlo.json'), fetch('sloToPl.json')]);
-            plToSlo = await r1.json(); sloToPl = await r2.json();
-            document.getElementById('dbStatus').textContent = "Słowniki aktywne";
+            const [r1, r2] = await Promise.all([
+                fetch('plToSlo.json'),
+                fetch('sloToPl.json')
+            ]);
+            plToSlo = await r1.json();
+            sloToPl = await r2.json();
+            document.getElementById('dbStatus').textContent = "Słowniki załadowane";
         } catch (e) {
-            document.getElementById('dbStatus').textContent = "Błąd słowników (CORS?)";
+            document.getElementById('dbStatus').textContent = "Błąd słowników (CORS)";
         }
     }
 
     function dictReplace(text, dict) {
         if (!dict || Object.keys(dict).length === 0) return text;
-        // Sortowanie kluczy od najdłuższych (ważne dla odmian)
         const sortedKeys = Object.keys(dict).sort((a, b) => b.length - a.length);
         let result = text;
         sortedKeys.forEach(key => {
@@ -157,16 +157,20 @@
             const res = await fetch(url);
             const data = await res.json();
             return data[0].map(x => x[0]).join('');
-        } catch (e) { return text; }
+        } catch (e) { 
+            return text; 
+        }
     }
 
     async function translate() {
         const text = document.getElementById('userInput').value.trim();
-        const src = document.getElementById('srcLang').value;
-        const tgt = document.getElementById('tgtLang').value;
+        const src = document.getElementById('srcLang').value || 'en';
+        const tgt = document.getElementById('tgtLang').value || 'slo';
         const out = document.getElementById('resultOutput');
-        if (!text) { out.innerText = ""; return; }
-
+        if (!text) { 
+            out.innerText = ""; 
+            return; 
+        }
         let finalResult = "";
         try {
             if (src === 'pl' && tgt === 'slo') {
@@ -182,8 +186,10 @@
             } else {
                 finalResult = await google(text, src, tgt);
             }
-            out.innerText = finalResult;
-        } catch (e) { out.innerText = "Błąd..."; }
+            out.innerText = finalResult || text;
+        } catch (e) {
+            out.innerText = "Błąd tłumaczenia";
+        }
     }
 
     function swapLanguages() {
@@ -191,27 +197,57 @@
         const tC = document.getElementById('tgtLang').value;
         const sD = document.getElementById('srcDisplay').value;
         const tD = document.getElementById('tgtDisplay').value;
-        document.getElementById('srcLang').value = tC; document.getElementById('tgtLang').value = sC;
-        document.getElementById('srcDisplay').value = tD; document.getElementById('tgtDisplay').value = sD;
+        document.getElementById('srcLang').value = tC;
+        document.getElementById('tgtLang').value = sC;
+        document.getElementById('srcDisplay').value = tD;
+        document.getElementById('tgtDisplay').value = sD;
         translate();
     }
 
-    function copyText() { navigator.clipboard.writeText(document.getElementById('resultOutput').innerText); }
-    function clearText() { document.getElementById('userInput').value = ''; document.getElementById('resultOutput').innerText = ''; }
-    async function pasteText() { document.getElementById('userInput').value = await navigator.clipboard.readText(); translate(); }
+    function copyText() {
+        const text = document.getElementById('resultOutput').innerText;
+        if (text) navigator.clipboard.writeText(text);
+    }
 
-    const debounce = (fn, ms) => { let t; return () => { clearTimeout(t); t = setTimeout(fn, ms); }; };
+    function clearText() {
+        document.getElementById('userInput').value = '';
+        document.getElementById('resultOutput').innerText = '';
+    }
+
+    async function pasteText() {
+        try {
+            const text = await navigator.clipboard.readText();
+            document.getElementById('userInput').value = text;
+            translate();
+        } catch(e) {}
+    }
+
+    function debounce(fn, ms) {
+        let t;
+        return () => {
+            clearTimeout(t);
+            t = setTimeout(fn, ms);
+        };
+    }
 
     async function init() {
-        applyUI('pl'); populateDropdowns('pl');
+        populateDropdowns();
         const sL = localStorage.getItem('srcLang') || 'en';
         const tL = localStorage.getItem('tgtLang') || 'slo';
-        selectLanguage('src', sL, languageData.find(x => x.code === sL).pl);
-        selectLanguage('tgt', tL, languageData.find(x => x.code === tL).pl);
+        const srcName = languageData.find(x => x.code === sL)?.pl || 'Angielski';
+        const tgtName = languageData.find(x => x.code === tL)?.pl || 'Słowiański';
+        document.getElementById('srcLang').value = sL;
+        document.getElementById('srcDisplay').value = srcName;
+        document.getElementById('tgtLang').value = tL;
+        document.getElementById('tgtDisplay').value = tgtName;
         await loadDictionaries();
-        document.getElementById('userInput').addEventListener('input', debounce(translate, 500));
-        document.addEventListener('click', (e) => { if (!e.target.closest('.lang-combobox')) hideAllDropdowns(); });
+        document.getElementById('userInput').addEventListener('input', debounce(translate, 400));
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.lang-combobox')) hideAllDropdowns();
+        });
+        translate(); // initial
     }
+
     window.onload = init;
 </script>
 </body>
