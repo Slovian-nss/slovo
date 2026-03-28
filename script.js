@@ -1,8 +1,8 @@
 let plToSlo = {}, sloToPl = {};
 
 const languageData = [
-    { code: 'en', pl: 'Angielski', en: 'English', slo: "Angol'ьsky", de: 'Englisch' },
     { code: 'slo', pl: 'Słowiański', en: 'Slovian (Slavic)', slo: 'Slověnьsky', de: 'Slawisch' },
+    { code: 'en', pl: 'Angielski', en: 'English', slo: "Angol'ьsky", de: 'Englisch' },
     { code: 'pl', pl: 'Polski', en: 'Polish', slo: "Pol'ьsky", de: 'Polnisch' },
     { code: 'de', pl: 'Niemiecki', en: 'German', slo: 'Nemьčьsky', de: 'Deutsch' },
     { code: 'cs', pl: 'Czeski', en: 'Czech', slo: 'Češьsky', de: 'Tschechisch' },
@@ -11,7 +11,47 @@ const languageData = [
     { code: 'fr', pl: 'Francuski', en: 'French', slo: 'Franьsky', de: 'Französisch' },
     { code: 'es', pl: 'Hiszpański', en: 'Spanish', slo: 'Španьsky', de: 'Spanisch' },
     { code: 'it', pl: 'Włoski', en: 'Italian', slo: 'Volšьsky', de: 'Italienisch' },
-    { code: 'uk', pl: 'Ukraiński', en: 'Ukrainian', slo: 'Ukrajinьsky', de: 'Ukrainisch' }
+    { code: 'uk', pl: 'Ukraiński', en: 'Ukrainian', slo: 'Ukrajinьsky', de: 'Ukrainisch' },
+
+    // Wszystkie języki Google Translate z tłumaczeniami nazw
+    { code: 'af', pl: 'Afrikaans', en: 'Afrikaans', slo: 'Afrikaans', de: 'Afrikaans' },
+    { code: 'sq', pl: 'Albański', en: 'Albanian', slo: 'Albanьsky', de: 'Albanisch' },
+    { code: 'am', pl: 'Amharski', en: 'Amharic', slo: 'Amharski', de: 'Amharisch' },
+    { code: 'ar', pl: 'Arabski', en: 'Arabic', slo: 'Arabьsky', de: 'Arabisch' },
+    { code: 'az', pl: 'Azerbejdżański', en: 'Azerbaijani', slo: 'Azerbejdžanьsky', de: 'Aserbaidschanisch' },
+    { code: 'bn', pl: 'Bengalski', en: 'Bengali', slo: 'Bengalski', de: 'Bengalisch' },
+    { code: 'be', pl: 'Białoruski', en: 'Belarusian', slo: 'Bělorusьsky', de: 'Weißrussisch' },
+    { code: 'bg', pl: 'Bułgarski', en: 'Bulgarian', slo: 'Bolgarski', de: 'Bulgarisch' },
+    { code: 'ca', pl: 'Kataloński', en: 'Catalan', slo: 'Katalaňsky', de: 'Katalanisch' },
+    { code: 'zh-CN', pl: 'Chiński (uproszczony)', en: 'Chinese (Simplified)', slo: 'Kitajьsky (uproščeny)', de: 'Chinesisch (Vereinfacht)' },
+    { code: 'zh-TW', pl: 'Chiński (tradycyjny)', en: 'Chinese (Traditional)', slo: 'Kitajьsky (tradicijny)', de: 'Chinesisch (Traditionell)' },
+    { code: 'hr', pl: 'Chorwacki', en: 'Croatian', slo: 'Hrvatski', de: 'Kroatisch' },
+    { code: 'da', pl: 'Duński', en: 'Danish', slo: 'Datski', de: 'Dänisch' },
+    { code: 'nl', pl: 'Holenderski', en: 'Dutch', slo: 'Niderlandьsky', de: 'Niederländisch' },
+    { code: 'et', pl: 'Estoński', en: 'Estonian', slo: 'Estonski', de: 'Estnisch' },
+    { code: 'fi', pl: 'Fiński', en: 'Finnish', slo: 'Finski', de: 'Finnisch' },
+    { code: 'gl', pl: 'Galicyjski', en: 'Galician', slo: 'Galicijski', de: 'Galizisch' },
+    { code: 'el', pl: 'Grecki', en: 'Greek', slo: 'Grečьsky', de: 'Griechisch' },
+    { code: 'hi', pl: 'Hindi', en: 'Hindi', slo: 'Hindi', de: 'Hindi' },
+    { code: 'hu', pl: 'Węgierski', en: 'Hungarian', slo: 'Madžarski', de: 'Ungarisch' },
+    { code: 'is', pl: 'Islandzki', en: 'Icelandic', slo: 'Islandski', de: 'Isländisch' },
+    { code: 'id', pl: 'Indonezyjski', en: 'Indonesian', slo: 'Indonezijski', de: 'Indonesisch' },
+    { code: 'ga', pl: 'Irlandzki', en: 'Irish', slo: 'Irski', de: 'Irisch' },
+    { code: 'ja', pl: 'Japoński', en: 'Japanese', slo: 'Japonski', de: 'Japanisch' },
+    { code: 'ko', pl: 'Koreański', en: 'Korean', slo: 'Korejski', de: 'Koreanisch' },
+    { code: 'lv', pl: 'Łotewski', en: 'Latvian', slo: 'Latvijski', de: 'Lettisch' },
+    { code: 'lt', pl: 'Litewski', en: 'Lithuanian', slo: 'Litovski', de: 'Litauisch' },
+    { code: 'mk', pl: 'Macedoński', en: 'Macedonian', slo: 'Makedonski', de: 'Mazedonisch' },
+    { code: 'ms', pl: 'Malajski', en: 'Malay', slo: 'Malajski', de: 'Malaiisch' },
+    { code: 'no', pl: 'Norweski', en: 'Norwegian', slo: 'Norveški', de: 'Norwegisch' },
+    { code: 'pt', pl: 'Portugalski', en: 'Portuguese', slo: 'Portugalski', de: 'Portugiesisch' },
+    { code: 'ro', pl: 'Rumuński', en: 'Romanian', slo: 'Rumunьsky', de: 'Rumänisch' },
+    { code: 'sr', pl: 'Serbski', en: 'Serbian', slo: 'Sirbьsky', de: 'Serbisch' },
+    { code: 'sl', pl: 'Słoweński', en: 'Slovenian', slo: 'Slovenski', de: 'Slowenisch' },
+    { code: 'sv', pl: 'Szwedzki', en: 'Swedish', slo: 'Švedski', de: 'Schwedisch' },
+    { code: 'th', pl: 'Tajski', en: 'Thai', slo: 'Tajski', de: 'Thailändisch' },
+    { code: 'tr', pl: 'Turecki', en: 'Turkish', slo: 'Turski', de: 'Türkisch' },
+    { code: 'vi', pl: 'Wietnamski', en: 'Vietnamese', slo: 'Vijetnamski', de: 'Vietnamesisch' }
 ];
 
 const uiTranslations = {
@@ -59,7 +99,6 @@ function applyUI(lang) {
 function populateLanguageLists(uiLang) {
     const srcSelect = document.getElementById('srcLang');
     const tgtSelect = document.getElementById('tgtLang');
-   
     srcSelect.options.length = 0;
     tgtSelect.options.length = 0;
     languageData.forEach(lang => {
