@@ -1,7 +1,25 @@
 let plToSlo = {}, sloToPl = {};
 
-const languageData = [ /* cały array languageData z oryginalnego kodu */ ];
-const uiTranslations = { /* cały obiekt uiTranslations z oryginalnego kodu */ };
+const languageData = [
+    { code: 'en', pl: 'Angielski', en: 'English', slo: "Angol'ьsky", de: 'Englisch' },
+    { code: 'slo', pl: 'Słowiański', en: 'Slovian (Slavic)', slo: 'Slověnьsky', de: 'Slawisch' },
+    { code: 'pl', pl: 'Polski', en: 'Polish', slo: "Pol'ьsky", de: 'Polnisch' },
+    { code: 'de', pl: 'Niemiecki', en: 'German', slo: 'Nemьčьsky', de: 'Deutsch' },
+    { code: 'cs', pl: 'Czeski', en: 'Czech', slo: 'Češьsky', de: 'Tschechisch' },
+    { code: 'sk', pl: 'Słowacki', en: 'Slovak', slo: 'Slovačьsky', de: 'Slowakisch' },
+    { code: 'ru', pl: 'Rosyjski', en: 'Russian', slo: 'Rusьsky', de: 'Russisch' },
+    { code: 'fr', pl: 'Francuski', en: 'French', slo: 'Franьsky', de: 'Französisch' },
+    { code: 'es', pl: 'Hiszpański', en: 'Spanish', slo: 'Španьsky', de: 'Spanisch' },
+    { code: 'it', pl: 'Włoski', en: 'Italian', slo: 'Volšьsky', de: 'Italienisch' },
+    { code: 'uk', pl: 'Ukraiński', en: 'Ukrainian', slo: 'Ukrajinьsky', de: 'Ukrainisch' }
+];
+
+const uiTranslations = {
+    pl: { title: "🌐 Slovo Tłumacz", from: "Z języka:", to: "Na język:", paste: "Wklej", clear: "Usuń", copy: "Kopiuj", placeholder: "Wpisz tekst..." },
+    en: { title: "🌐 Slovo Translator", from: "From language:", to: "To language:", paste: "Paste", clear: "Clear", copy: "Copy", placeholder: "Type here..." },
+    slo: { title: "🌐 Slovo Perkladačь", from: "Iz języka:", to: "Na język:", paste: "Vstavi", clear: "Izbriši", copy: "Kopi", placeholder: "Piši tu..." },
+    de: { title: "🌐 Slovo Übersetzer", from: "Von:", to: "Nach:", paste: "Einfügen", clear: "Löschen", copy: "Kopieren", placeholder: "Text eingeben..." }
+};
 
 async function init() {
     const sysLang = navigator.language.split('-')[0];
@@ -12,7 +30,7 @@ async function init() {
    
     let defaultSrc = 'en';
     let defaultTgt = 'slo';
-    if(sysLang === 'pl') defaultSrc = 'pl';
+    if (sysLang === 'pl') defaultSrc = 'pl';
    
     const savedSrc = localStorage.getItem('srcLang') || defaultSrc;
     const savedTgt = localStorage.getItem('tgtLang') || defaultTgt;
@@ -27,6 +45,132 @@ async function init() {
     document.getElementById('tgtLang').onchange = (e) => { localStorage.setItem('tgtLang', e.target.value); translate(); };
 }
 
-// Wklej tutaj resztę funkcji: applyUI, populateLanguageLists, loadDictionaries, translate, google, dictReplace, swapLanguages, pasteText, copyText, clearText, debounce
+function applyUI(lang) {
+    const ui = uiTranslations[lang] || uiTranslations.en;
+    document.getElementById('ui-title').innerText = ui.title;
+    document.getElementById('ui-label-from').innerText = ui.from;
+    document.getElementById('ui-label-to').innerText = ui.to;
+    document.getElementById('ui-paste').innerText = ui.paste;
+    document.getElementById('ui-clear').innerText = ui.clear;
+    document.getElementById('ui-copy').innerText = ui.copy;
+    document.getElementById('userInput').placeholder = ui.placeholder;
+}
+
+function populateLanguageLists(uiLang) {
+    const srcSelect = document.getElementById('srcLang');
+    const tgtSelect = document.getElementById('tgtLang');
+   
+    srcSelect.options.length = 0;
+    tgtSelect.options.length = 0;
+    languageData.forEach(lang => {
+        const name = lang[uiLang] || lang.en;
+        srcSelect.add(new Option(name, lang.code));
+        tgtSelect.add(new Option(name, lang.code));
+    });
+}
+
+async function loadDictionaries() {
+    const status = document.getElementById('dbStatus');
+    try {
+        const files = ['osnova.json', 'vuzor.json'];
+        for (const file of files) {
+            const res = await fetch(file);
+            if (res.ok) {
+                const data = await res.json();
+                data.forEach(item => {
+                    if (item.polish && item.slovian) {
+                        plToSlo[item.polish.toLowerCase().trim()] = item.slovian.trim();
+                        sloToPl[item.slovian.toLowerCase().trim()] = item.polish.trim();
+                    }
+                });
+            }
+        }
+        status.innerText = "Engine Ready.";
+    } catch (e) { status.innerText = "Dict Error."; }
+}
+
+async function translate() {
+    const text = document.getElementById('userInput').value.trim();
+    const src = document.getElementById('srcLang').value;
+    const tgt = document.getElementById('tgtLang').value;
+    const out = document.getElementById('resultOutput');
+    if (!text) { out.innerText = ""; return; }
+    try {
+        let finalResult = "";
+        if (src === 'slo' && tgt === 'pl') {
+            finalResult = dictReplace(text, sloToPl);
+        } else if (src === 'pl' && tgt === 'slo') {
+            finalResult = dictReplace(text, plToSlo);
+        } else if (src === 'slo') {
+            const bridge = dictReplace(text, sloToPl);
+            finalResult = await google(bridge, 'pl', tgt);
+        } else if (tgt === 'slo') {
+            const bridge = await google(text, src, 'pl');
+            finalResult = dictReplace(bridge, plToSlo);
+        } else {
+            finalResult = await google(text, src, tgt);
+        }
+        out.innerText = finalResult || "";
+    } catch (e) { out.innerText = "Translation error..."; }
+}
+
+async function google(text, s, t) {
+    try {
+        const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${s}&tl=${t}&dt=t&q=${encodeURIComponent(text)}`;
+        const res = await fetch(url);
+        const data = await res.json();
+        return data[0].map(x => x[0]).join('');
+    } catch (e) { return text; }
+}
+
+function dictReplace(text, dict) {
+    return text.replace(/[a-ząćęłńóśźżěьъ]+/gi, (m) => {
+        const low = m.toLowerCase();
+        if (dict[low]) {
+            const r = dict[low];
+            if (m === m.toUpperCase()) return r.toUpperCase();
+            if (m[0] === m[0].toUpperCase()) return r.charAt(0).toUpperCase() + r.slice(1);
+            return r;
+        }
+        return m;
+    });
+}
+
+function swapLanguages() {
+    const src = document.getElementById('srcLang');
+    const tgt = document.getElementById('tgtLang');
+    const temp = src.value;
+    src.value = tgt.value;
+    tgt.value = temp;
+    localStorage.setItem('srcLang', src.value);
+    localStorage.setItem('tgtLang', tgt.value);
+    translate();
+}
+
+async function pasteText() {
+    try {
+        const text = await navigator.clipboard.readText();
+        document.getElementById('userInput').value = text;
+        translate();
+    } catch(e) { alert("Please allow clipboard access"); }
+}
+
+function copyText() {
+    const text = document.getElementById('resultOutput').innerText;
+    navigator.clipboard.writeText(text);
+}
+
+function clearText() {
+    document.getElementById('userInput').value = "";
+    document.getElementById('resultOutput').innerText = "";
+}
+
+function debounce(func, wait) {
+    let timeout;
+    return function() {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(this, arguments), wait);
+    };
+}
 
 window.onload = init;
