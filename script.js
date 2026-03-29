@@ -1,5 +1,5 @@
 let plToSlo = {}, sloToPl = {};
-const translationCache = new Map();
+let wordTypes = {}; // Przechowuje typy: noun, adjective, numeral
 
 const languageData = [
     { code: 'slo', pl: 'Słowiański', en: 'Slovian (Slavic)', slo: 'Slověnьsky', de: 'Slawisch' },
@@ -52,6 +52,7 @@ const languageData = [
     { code: 'tr', pl: 'Turecki', en: 'Turkish', slo: 'Turečьsky', de: 'Türkisch' },
     { code: 'vi', pl: 'Wietnamski', en: 'Vietnamese', slo: 'Větnamьsky', de: 'Vietnamesisch' }
 ];
+
 const uiTranslations = {
     slo: { title: "Slovo Perkladačь", from: "Jiz ęzyka:", to: "Na ęzyk:", paste: "Vyloži", clear: "Terbi", copy: "Poveli", placeholder: "Piši tu..." },
     pl: { title: "Slovo Tłumacz", from: "Z języka:", to: "Na język:", paste: "Wklej", clear: "Usuń", copy: "Kopiuj", placeholder: "Wpisz tekst..." },
@@ -67,7 +68,7 @@ const uiTranslations = {
     da: { title: "Slovo Oversætter", from: "Fra:", to: "Til:", paste: "Indsæt", clear: "Ryd", copy: "Kopiér", placeholder: "Indtast tekst..." },
     fi: { title: "Slovo Kääntäjä", from: "Lähde:", to: "Kohde:", paste: "Liitä", clear: "Tyhjennä", copy: "Kopioi", placeholder: "Kirjoita teksti..." },
     ru: { title: "Slovo Переводчик", from: "С языка:", to: "На язык:", paste: "Вставить", clear: "Очистить", copy: "Копировать", placeholder: "Введите текст..." },
-    uk: { title: "Slovo Перекладач", from: "З мови:", to: "На мову:", paste: "Вставити", clear: "Очистити", copy: "Копіювати", placeholder: "Введіть текст..." },
+    uk: { title: "Slovo Перекладач", from: "З мови:", to: "На мову:", paste: "Вставити", clear: "Очиstити", copy: "Копіювати", placeholder: "Введіть текст..." },
     cs: { title: "Slovo Překladač", from: "Z jazyka:", to: "Do jazyka:", paste: "Vložit", clear: "Vymazat", copy: "Kopírovat", placeholder: "Zadejte text..." },
     sk: { title: "Slovo Prekladač", from: "Z jazyka:", to: "Do jazyka:", paste: "Vložiť", clear: "Vymazať", copy: "Kopírovat", placeholder: "Zadajte text..." },
     sl: { title: "Slovo Prevajalnik", from: "Iz:", to: "V:", paste: "Prilepi", clear: "Počisti", copy: "Kopiraj", placeholder: "Vnesi besedilo..." },
@@ -84,15 +85,36 @@ const uiTranslations = {
     ar: { title: "مترجم Slovo", from: "من:", to: "إلى:", paste: "لصق", clear: "مسح", copy: "نسخ", placeholder: "أدخل النص..." }
 };
 
-function normalizeText(text) {
-    return text.replace(/\s+/g, ' ').trim();
+/**
+ * Funkcja zamieniająca szyk: Jeśli Rzeczownik + Przymiotnik/Liczebnik -> zamień na Przymiotnik/Liczebnik + Rzeczownik.
+ */
+function fixSlovianWordOrder(text) {
+    // Rozbijamy tekst na słowa zachowując białe znaki
+    let words = text.split(/(\s+)/);
+    
+    for (let i = 0; i < words.length - 2; i += 2) {
+        let current = words[i].toLowerCase().replace(/[.,!?;:]/g, "");
+        let next = words[i + 2] ? words[i + 2].toLowerCase().replace(/[.,!?;:]/g, "") : null;
+
+        if (next && wordTypes[current] === 'noun') {
+            if (wordTypes[next] === 'adjective' || wordTypes[next] === 'numeral') {
+                // Zamiana miejscami
+                let temp = words[i];
+                words[i] = words[i + 2];
+                words[i + 2] = temp;
+                // Przesuwamy indeks, by nie analizować tej pary ponownie
+                i += 2;
+            }
+        }
+    }
+    return words.join('');
 }
 
 function dictReplace(text, dict) {
-    return text.replace(/[\p{L}']+/gu, (m) => {
+    return text.replace(/[a-ząćęłńóśźżěьъ]+/gi, (m) => {
         const low = m.toLowerCase();
         if (dict[low]) {
-            let r = dict[low];
+            const r = dict[low];
             if (m === m.toUpperCase()) return r.toUpperCase();
             if (m[0] === m[0].toUpperCase()) return r.charAt(0).toUpperCase() + r.slice(1);
             return r;
@@ -101,71 +123,31 @@ function dictReplace(text, dict) {
     });
 }
 
-function reorderAdjNumBeforeNoun(text) {
-    return text
-        .replace(/(\b\w+(?:ьsky|ьska|ьsko)\b)\s+(\b\w+\b)/gi, '$2 $1')
-        .replace(/(\b\d+\b)\s+(\b\w+\b)/gi, '$2 $1');
-}
-
-async function detectLanguage(text) {
-    try {
-        const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=en&dt=t&q=${encodeURIComponent(text)}`;
-        const res = await fetch(url);
-        const data = await res.json();
-        return data[2] || 'en';
-    } catch {
-        return 'en';
-    }
-}
-
 async function translate() {
-    let text = normalizeText(document.getElementById('userInput').value);
-    let src = document.getElementById('srcLang').value;
+    const text = document.getElementById('userInput').value.trim();
+    const src = document.getElementById('srcLang').value;
     const tgt = document.getElementById('tgtLang').value;
     const out = document.getElementById('resultOutput');
-
-    if (!text) {
-        out.innerText = "";
-        return;
-    }
-
-    const cacheKey = `${src}:${tgt}:${text}`;
-    if (translationCache.has(cacheKey)) {
-        out.innerText = translationCache.get(cacheKey);
-        return;
-    }
-
+    if (!text) { out.innerText = ""; return; }
     try {
-        if (src === 'auto') {
-            src = await detectLanguage(text);
-        }
-
-        let result = "";
-
+        let finalResult = "";
         if (src === 'slo' && tgt === 'pl') {
-            result = dictReplace(text, sloToPl);
-        } 
-        else if (src === 'pl' && tgt === 'slo') {
-            result = reorderAdjNumBeforeNoun(dictReplace(text, plToSlo));
-        } 
-        else if (src === 'slo') {
+            finalResult = dictReplace(text, sloToPl);
+        } else if (src === 'pl' && tgt === 'slo') {
+            let temp = dictReplace(text, plToSlo);
+            finalResult = fixSlovianWordOrder(temp);
+        } else if (src === 'slo') {
             const bridge = dictReplace(text, sloToPl);
-            result = await google(bridge, 'pl', tgt);
-        } 
-        else if (tgt === 'slo') {
+            finalResult = await google(bridge, 'pl', tgt);
+        } else if (tgt === 'slo') {
             const bridge = await google(text, src, 'pl');
-            result = reorderAdjNumBeforeNoun(dictReplace(bridge, plToSlo));
-        } 
-        else {
-            result = await google(text, src, tgt);
+            let temp = dictReplace(bridge, plToSlo);
+            finalResult = fixSlovianWordOrder(temp);
+        } else {
+            finalResult = await google(text, src, tgt);
         }
-
-        translationCache.set(cacheKey, result);
-        out.innerText = result;
-
-    } catch (e) {
-        out.innerText = "Translation error...";
-    }
+        out.innerText = finalResult || "";
+    } catch (e) { out.innerText = "Translation error..."; }
 }
 
 async function google(text, s, t) {
@@ -174,58 +156,119 @@ async function google(text, s, t) {
         const res = await fetch(url);
         const data = await res.json();
         return data[0].map(x => x[0]).join('');
-    } catch {
-        return text;
-    }
+    } catch (e) { return text; }
 }
 
 async function loadDictionaries() {
+    const status = document.getElementById('dbStatus');
     try {
         const files = ['osnova.json', 'vuzor.json'];
         for (const file of files) {
             const res = await fetch(file);
-            const data = await res.json();
-            data.forEach(item => {
-                if (item.polish && item.slovian) {
-                    plToSlo[item.polish.toLowerCase()] = item.slovian;
-                    sloToPl[item.slovian.toLowerCase()] = item.polish;
-                }
-            });
+            if (res.ok) {
+                const data = await res.json();
+                data.forEach(item => {
+                    if (item.polish && item.slovian) {
+                        const sWord = item.slovian.trim();
+                        const sLow = sWord.toLowerCase();
+                        const pLow = item.polish.toLowerCase().trim();
+                        
+                        plToSlo[pLow] = sWord;
+                        sloToPl[sLow] = item.polish.trim();
+
+                        // Rozpoznawanie typu na podstawie kolumny "type and case"
+                        const info = item['type and case'] ? item['type and case'].toLowerCase() : "";
+                        if (info.includes('noun') || info.includes('jimenovnik')) {
+                            wordTypes[sLow] = 'noun';
+                        } else if (info.includes('adjective') || info.includes('pridavnik')) {
+                            wordTypes[sLow] = 'adjective';
+                        } else if (info.includes('numeral') || info.includes('ličebnik')) {
+                            wordTypes[sLow] = 'numeral';
+                        }
+                    }
+                });
+            }
         }
-        document.getElementById('dbStatus').innerText = "Engine Ready";
-    } catch {
-        document.getElementById('dbStatus').innerText = "Dict Error";
-    }
-}
-
-function populateLanguageLists(uiLang) {
-    const src = document.getElementById('srcLang');
-    const tgt = document.getElementById('tgtLang');
-
-    src.innerHTML = "";
-    tgt.innerHTML = "";
-
-    languageData.forEach(lang => {
-        const name = lang[uiLang] || lang.en;
-        src.add(new Option(name, lang.code));
-        tgt.add(new Option(name, lang.code));
-    });
-}
-
-function debounce(func, wait) {
-    let t;
-    return (...args) => {
-        clearTimeout(t);
-        t = setTimeout(() => func(...args), wait);
-    };
+        status.innerText = "Engine Ready.";
+    } catch (e) { status.innerText = "Dict Error."; }
 }
 
 async function init() {
-    populateLanguageLists('en');
+    const sysLang = navigator.language.split('-')[0];
+    const uiKey = uiTranslations[sysLang] ? sysLang : 'en';
+    applyUI(uiKey);
+    populateLanguageLists(uiKey);
+    let defaultSrc = 'en';
+    let defaultTgt = 'slo';
+    if (sysLang === 'pl') defaultSrc = 'pl';
+    const savedSrc = localStorage.getItem('srcLang') || defaultSrc;
+    const savedTgt = localStorage.getItem('tgtLang') || defaultTgt;
+    document.getElementById('srcLang').value = savedSrc;
+    document.getElementById('tgtLang').value = savedTgt;
     await loadDictionaries();
+    document.getElementById('userInput').addEventListener('input', debounce(() => translate(), 300));
+    document.getElementById('srcLang').onchange = (e) => { localStorage.setItem('srcLang', e.target.value); translate(); };
+    document.getElementById('tgtLang').onchange = (e) => { localStorage.setItem('tgtLang', e.target.value); translate(); };
+}
 
-    document.getElementById('userInput')
-        .addEventListener('input', debounce(translate, 300));
+function applyUI(lang) {
+    const ui = uiTranslations[lang] || uiTranslations.en;
+    document.getElementById('ui-title').innerText = ui.title;
+    document.getElementById('ui-label-from').innerText = ui.from;
+    document.getElementById('ui-label-to').innerText = ui.to;
+    document.getElementById('ui-paste').innerText = ui.paste;
+    document.getElementById('ui-clear').innerText = ui.clear;
+    document.getElementById('ui-copy').innerText = ui.copy;
+    document.getElementById('userInput').placeholder = ui.placeholder;
+}
+
+function populateLanguageLists(uiLang) {
+    const srcSelect = document.getElementById('srcLang');
+    const tgtSelect = document.getElementById('tgtLang');
+    srcSelect.options.length = 0;
+    tgtSelect.options.length = 0;
+    languageData.forEach(lang => {
+        const name = lang[uiLang] || lang.en;
+        srcSelect.add(new Option(name, lang.code));
+        tgtSelect.add(new Option(name, lang.code));
+    });
+}
+
+function swapLanguages() {
+    const src = document.getElementById('srcLang');
+    const tgt = document.getElementById('tgtLang');
+    const temp = src.value;
+    src.value = tgt.value;
+    tgt.value = temp;
+    localStorage.setItem('srcLang', src.value);
+    localStorage.setItem('tgtLang', tgt.value);
+    translate();
+}
+
+async function pasteText() {
+    try {
+        const text = await navigator.clipboard.readText();
+        document.getElementById('userInput').value = text;
+        translate();
+    } catch(e) { alert("Please allow clipboard access"); }
+}
+
+function copyText() {
+    const text = document.getElementById('resultOutput').innerText;
+    navigator.clipboard.writeText(text);
+}
+
+function clearText() {
+    document.getElementById('userInput').value = "";
+    document.getElementById('resultOutput').innerText = "";
+}
+
+function debounce(func, wait) {
+    let timeout;
+    return function() {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(this, arguments), wait);
+    };
 }
 
 window.onload = init;
