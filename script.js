@@ -1,3 +1,20 @@
+<script>
+/**
+ * Funkcja sortująca słowa zgodnie z regułą: liczebnik -> przymiotnik -> rzeczownik.
+ */
+function orderSlovianPhrase(words) {
+    const weights = {
+        'numeral': 1,
+        'adjective': 2,
+        'noun': 3
+    };
+    return words.sort((a, b) => {
+        const typeA = a['type and case'].split(' - ')[0].toLowerCase();
+        const typeB = b['type and case'].split(' - ')[0].toLowerCase();
+        return (weights[typeA] || 99) - (weights[typeB] || 99);
+    });
+}
+
 let plToSlo = {}, sloToPl = {};
 const languageData = [
     { code: 'slo', pl: 'Słowiański', en: 'Slovian (Slavic)', slo: 'Slověnьsky', de: 'Slawisch' },
@@ -81,7 +98,6 @@ const uiTranslations = {
     ko: { title: "Slovo 번역기", from: "출발:", to: "도착:", paste: "붙여넣기", clear: "지우기", copy: "복사", placeholder: "텍스트 입력..." },
     ar: { title: "مترجم Slovo", from: "من:", to: "إلى:", paste: "لصق", clear: "مسح", copy: "نسخ", placeholder: "أدخل النص..." }
 };
-
 function dictReplace(text, dict) {
     return text.replace(/[a-ząćęłńóśźżěьъ]+/gi, (m) => {
         const low = m.toLowerCase();
@@ -94,12 +110,10 @@ function dictReplace(text, dict) {
         return m;
     });
 }
-
 function reorderAdjNumBeforeNoun(slovianText) {
     return slovianText.replace(/(\b\w+(?:ьsky|ьska|ьsko|ьscy|ьskich|ьskimi)\b)\s+(\b\w+\b)/gi, '$2 $1')
                       .replace(/(\b(?:nekoliko|raz|razy|pirvy|drugo|treti|četvrty|peti|šesti|sedmi|osmi|devęty|desęty|jedin|dva|tri)\b)\s+(\b\w+\b)/gi, '$2 $1');
 }
-
 async function translate() {
     const text = document.getElementById('userInput').value.trim();
     const src = document.getElementById('srcLang').value;
@@ -126,7 +140,6 @@ async function translate() {
         out.innerText = finalResult || "";
     } catch (e) { out.innerText = "Translation error..."; }
 }
-
 async function google(text, s, t) {
     try {
         const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${s}&tl=${t}&dt=t&q=${encodeURIComponent(text)}`;
@@ -135,7 +148,6 @@ async function google(text, s, t) {
         return data[0].map(x => x[0]).join('');
     } catch (e) { return text; }
 }
-
 async function loadDictionaries() {
     const status = document.getElementById('dbStatus');
     try {
@@ -155,7 +167,6 @@ async function loadDictionaries() {
         status.innerText = "Engine Ready.";
     } catch (e) { status.innerText = "Dict Error."; }
 }
-
 async function init() {
     const sysLang = navigator.language.split('-')[0];
     const uiKey = uiTranslations[sysLang] ? sysLang : 'en';
@@ -173,7 +184,6 @@ async function init() {
     document.getElementById('srcLang').onchange = (e) => { localStorage.setItem('srcLang', e.target.value); translate(); };
     document.getElementById('tgtLang').onchange = (e) => { localStorage.setItem('tgtLang', e.target.value); translate(); };
 }
-
 function applyUI(lang) {
     const ui = uiTranslations[lang] || uiTranslations.en;
     document.getElementById('ui-title').innerText = ui.title;
@@ -184,7 +194,6 @@ function applyUI(lang) {
     document.getElementById('ui-copy').innerText = ui.copy;
     document.getElementById('userInput').placeholder = ui.placeholder;
 }
-
 function populateLanguageLists(uiLang) {
     const srcSelect = document.getElementById('srcLang');
     const tgtSelect = document.getElementById('tgtLang');
@@ -196,7 +205,6 @@ function populateLanguageLists(uiLang) {
         tgtSelect.add(new Option(name, lang.code));
     });
 }
-
 function swapLanguages() {
     const src = document.getElementById('srcLang');
     const tgt = document.getElementById('tgtLang');
@@ -207,7 +215,6 @@ function swapLanguages() {
     localStorage.setItem('tgtLang', tgt.value);
     translate();
 }
-
 async function pasteText() {
     try {
         const text = await navigator.clipboard.readText();
@@ -215,17 +222,14 @@ async function pasteText() {
         translate();
     } catch(e) { alert("Please allow clipboard access"); }
 }
-
 function copyText() {
     const text = document.getElementById('resultOutput').innerText;
     navigator.clipboard.writeText(text);
 }
-
 function clearText() {
     document.getElementById('userInput').value = "";
     document.getElementById('resultOutput').innerText = "";
 }
-
 function debounce(func, wait) {
     let timeout;
     return function() {
@@ -233,5 +237,5 @@ function debounce(func, wait) {
         timeout = setTimeout(() => func.apply(this, arguments), wait);
     };
 }
-
 window.onload = init;
+</script>
