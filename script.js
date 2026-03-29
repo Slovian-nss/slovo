@@ -7,74 +7,89 @@ let dictionaryData = [];
 const weights = { 'numeral': 1, 'adjective': 2, 'noun': 3 };
 
 function orderSlovianPhrase(words) {
+    // Sortujemy tylko jeśli mamy przynajmniej jeden znany typ inny niż unknown
+    const hasKnownTypes = words.some(w => w.type !== 'unknown');
+    if (!hasKnownTypes) return words;
+
     return [...words].sort((a, b) => {
-        const typeA = (a.type || '').toLowerCase();
-        const typeB = (b.type || '').toLowerCase();
-        return (weights[typeA] || 99) - (weights[typeB] || 99);
+        const weightA = weights[a.type] || 99;
+        const weightB = weights[b.type] || 99;
+        return weightA - weightB;
     });
 }
 
-const languageData = [
-    { code: 'slo', pl: 'Słowiański', en: 'Slovian (Slavic)', slo: 'Slověnьsky', de: 'Slawisch' },
-    { code: 'pl', pl: 'Polski', en: 'Polish', slo: "Pol'ьsky", de: 'Polnisch' },
-    { code: 'en', pl: 'Angielski', en: 'English', slo: "Angol'ьsky", de: 'Englisch' },
-    { code: 'de', pl: 'Niemiecki', en: 'German', slo: 'Nemьčьsky', de: 'Deutsch' },
-    { code: 'cs', pl: 'Czeski', en: 'Czech', slo: 'Češьsky', de: 'Tschechisch' },
-    { code: 'sk', pl: 'Słowacki', en: 'Slovak', slo: 'Slovačьsky', de: 'Slowakisch' },
-    { code: 'ru', pl: 'Rosyjski', en: 'Russian', slo: 'Rusьsky', de: 'Russisch' },
-    { code: 'fr', pl: 'Francuski', en: 'French', slo: 'Franьsky', de: 'Französisch' },
-    { code: 'es', pl: 'Hiszpański', en: 'Spanish', slo: 'Španьsky', de: 'Spanisch' },
-    { code: 'it', pl: 'Włoski', en: 'Italian', slo: 'Volšьsky', de: 'Italienisch' },
-    { code: 'uk', pl: 'Ukraiński', en: 'Ukrainian', slo: 'Ukrajinьsky', de: 'Ukrainisch' },
-    { code: 'zh-CN', pl: 'Chiński (uproszczony)', en: 'Chinese (Simplified)', slo: 'Kitajьsky (Uproščeny)', de: 'Chinesisch' }
-];
+function findWordType(word) {
+    const low = word.toLowerCase().trim();
+    
+    // 1. Szukanie bezpośrednie
+    let entry = dictionaryData.find(d => d.slovian && d.slovian.toLowerCase() === low);
+    
+    // 2. Szukanie "rozmyte" (jeśli słowo ma końcówkę gramatyczną)
+    if (!entry) {
+        entry = dictionaryData.find(d => {
+            if (!d.slovian) return false;
+            const base = d.slovian.toLowerCase();
+            // Sprawdza czy słowo zaczyna się od rdzenia ze słownika (min 3 litery)
+            return low.startsWith(base.substring(0, Math.max(3, base.length - 2)));
+        });
+    }
 
-const uiTranslations = {
-    slo: { title: "Slovo Perkladačь", from: "Jiz ęzyka:", to: "Na ęzyk:", paste: "Vyloži", clear: "Terbi", copy: "Poveli", placeholder: "Piši tu..." },
-    pl: { title: "Slovo Tłumacz", from: "Z języka:", to: "Na język:", paste: "Wklej", clear: "Usuń", copy: "Kopiuj", placeholder: "Wpisz tekst..." },
-    en: { title: "Slovo Translator", from: "From language:", to: "To language:", paste: "Paste", clear: "Clear", copy: "Copy", placeholder: "Type here..." },
-    de: { title: "Slovo Übersetzer", from: "Von:", to: "Nach:", paste: "Einfügen", clear: "Löschen", copy: "Kopieren", placeholder: "Text eingeben..." }
-};
-
-function dictReplace(text, dict) {
-    return text.replace(/[a-ząćęłńóśźżěьъǫ\u0300-\u036f]+/gi, (m) => {
-        const low = m.toLowerCase();
-        if (dict[low]) {
-            const r = dict[low];
-            if (m === m.toUpperCase()) return r.toUpperCase();
-            if (m[0] === m[0].toUpperCase()) return r.charAt(0).toUpperCase() + r.slice(1);
-            return r;
-        }
-        return m;
-    });
+    if (entry && entry['type and case']) {
+        const typePart = entry['type and case'].split(' - ')[0].trim().toLowerCase();
+        // Mapowanie nazw na klucze wag
+        if (typePart.includes('numeral')) return 'numeral';
+        if (typePart.includes('adjective')) return 'adjective';
+        if (typePart.includes('noun')) return 'noun';
+    }
+    return 'unknown';
 }
 
 function smartReorder(text) {
-    return text.split(/([.!?\s,]+)/).map(segment => {
-        if (/^[.!?\s,]+$/.test(segment) || segment.trim() === "") return segment;
+    // Rozbijanie na segmenty (zdania/frazy)
+    return text.split(/([.!?\n,]+)/).map(segment => {
+        if (/^[.!?\n,]+$/.test(segment) || segment.trim() === "") return segment;
         
-        const wordsInSegment = segment.split(' ').filter(w => w.length > 0);
-        if (wordsInSegment.length < 2) return segment;
+        // Rozbijamy na słowa zachowując spacje jako oddzielne elementy lub używamy filter
+        const tokens = segment.split(/(\s+)/);
+        const wordsOnly = [];
+        const positions = [];
 
-        const mappedWords = wordsInSegment.map(w => {
-            const low = w.toLowerCase();
-            const entry = dictionaryData.find(d => d.slovian && d.slovian.toLowerCase() === low);
-            let type = 'unknown';
-            if (entry && entry['type and case']) {
-                type = entry['type and case'].split(' - ')[0].trim().toLowerCase();
+        // Wyciągamy tylko słowa do posortowania
+        tokens.forEach((token, index) => {
+            if (token.trim().length > 0) {
+                wordsOnly.push({
+                    original: token,
+                    type: findWordType(token),
+                    pos: index
+                });
             }
-            return { original: w, type: type };
         });
 
-        return orderSlovianPhrase(mappedWords).map(obj => obj.original).join(' ');
+        if (wordsOnly.length < 2) return segment;
+
+        const sortedWords = orderSlovianPhrase(wordsOnly);
+        
+        // Rekonstrukcja segmentu z nową kolejnością
+        let wordIdx = 0;
+        return tokens.map((token, index) => {
+            if (token.trim().length > 0) {
+                return sortedWords[wordIdx++].original;
+            }
+            return token;
+        }).join('');
     }).join('');
 }
 
+// --- RESZTA FUNKCJI (translate, google, loadDictionaries itd.) ---
+
 async function translate() {
-    const text = document.getElementById('userInput').value.trim();
+    const userInput = document.getElementById('userInput');
+    const out = document.getElementById('resultOutput');
+    if (!userInput) return;
+    
+    const text = userInput.value.trim();
     const src = document.getElementById('srcLang').value;
     const tgt = document.getElementById('tgtLang').value;
-    const out = document.getElementById('resultOutput');
     
     if (!text) { out.innerText = ""; return; }
 
@@ -90,13 +105,27 @@ async function translate() {
             finalResult = await google(bridge, 'pl', tgt);
         } else if (tgt === 'slo') {
             const bridge = await google(text, src, 'pl');
+            // Najpierw zamiana słownikowa, potem reorder
             let temp = dictReplace(bridge, plToSlo);
             finalResult = smartReorder(temp);
         } else {
             finalResult = await google(text, src, tgt);
         }
         out.innerText = finalResult || "";
-    } catch (e) { out.innerText = "Translation error..."; }
+    } catch (e) { out.innerText = "Error..."; }
+}
+
+function dictReplace(text, dict) {
+    return text.replace(/[a-ząćęłńóśźżěьъǫ\u0300-\u036f'‘’]+/gi, (m) => {
+        const low = m.toLowerCase();
+        if (dict[low]) {
+            const r = dict[low];
+            if (m === m.toUpperCase()) return r.toUpperCase();
+            if (m[0] === m[0].toUpperCase()) return r.charAt(0).toUpperCase() + r.slice(1);
+            return r;
+        }
+        return m;
+    });
 }
 
 async function google(text, s, t) {
@@ -125,10 +154,11 @@ async function loadDictionaries() {
                 });
             }
         }
-        if(status) status.innerText = "Engine Ready.";
+        if(status) status.innerText = "Engine Ready. v4.1";
     } catch (e) { if(status) status.innerText = "Dict Error."; }
 }
 
+// Funkcje pomocnicze UI
 async function init() {
     const sysLang = navigator.language.split('-')[0];
     const uiKey = uiTranslations[sysLang] ? sysLang : 'en';
@@ -140,19 +170,18 @@ async function init() {
     
     await loadDictionaries();
     
-    document.getElementById('userInput').addEventListener('input', debounce(() => translate(), 300));
+    document.getElementById('userInput').addEventListener('input', debounce(() => translate(), 400));
     document.getElementById('srcLang').onchange = (e) => { localStorage.setItem('srcLang', e.target.value); translate(); };
     document.getElementById('tgtLang').onchange = (e) => { localStorage.setItem('tgtLang', e.target.value); translate(); };
 }
 
 function applyUI(lang) {
     const ui = uiTranslations[lang] || uiTranslations.en;
-    if(document.getElementById('ui-title')) document.getElementById('ui-title').innerText = ui.title;
-    if(document.getElementById('ui-label-from')) document.getElementById('ui-label-from').innerText = ui.from;
-    if(document.getElementById('ui-label-to')) document.getElementById('ui-label-to').innerText = ui.to;
-    if(document.getElementById('ui-paste')) document.getElementById('ui-paste').innerText = ui.paste;
-    if(document.getElementById('ui-clear')) document.getElementById('ui-clear').innerText = ui.clear;
-    if(document.getElementById('ui-copy')) document.getElementById('ui-copy').innerText = ui.copy;
+    const ids = ['ui-title', 'ui-label-from', 'ui-label-to', 'ui-paste', 'ui-clear', 'ui-copy'];
+    ids.forEach(id => {
+        const el = document.getElementById(id);
+        if(el) el.innerText = ui[id.replace('ui-', '')];
+    });
     if(document.getElementById('userInput')) document.getElementById('userInput').placeholder = ui.placeholder;
 }
 
@@ -170,28 +199,12 @@ function populateLanguageLists(uiLang) {
 function swapLanguages() {
     const src = document.getElementById('srcLang');
     const tgt = document.getElementById('tgtLang');
-    [src.value, tgt.value] = [tgt.value, src.value];
+    const temp = src.value;
+    src.value = tgt.value;
+    tgt.value = temp;
     localStorage.setItem('srcLang', src.value);
     localStorage.setItem('tgtLang', tgt.value);
     translate();
-}
-
-async function pasteText() {
-    try {
-        const text = await navigator.clipboard.readText();
-        document.getElementById('userInput').value = text;
-        translate();
-    } catch(e) { console.error("Clipboard error"); }
-}
-
-function copyText() {
-    const text = document.getElementById('resultOutput').innerText;
-    navigator.clipboard.writeText(text);
-}
-
-function clearText() {
-    document.getElementById('userInput').value = "";
-    document.getElementById('resultOutput').innerText = "";
 }
 
 function debounce(func, wait) {
@@ -202,4 +215,21 @@ function debounce(func, wait) {
     };
 }
 
+// Uruchomienie
 window.onload = init;
+
+// Funkcje pomocnicze przycisków
+async function pasteText() {
+    try {
+        const text = await navigator.clipboard.readText();
+        document.getElementById('userInput').value = text;
+        translate();
+    } catch(e) {}
+}
+function copyText() {
+    navigator.clipboard.writeText(document.getElementById('resultOutput').innerText);
+}
+function clearText() {
+    document.getElementById('userInput').value = "";
+    document.getElementById('resultOutput').innerText = "";
+}
