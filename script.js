@@ -240,19 +240,48 @@ async function loadDictionaries() {
 }
 
 async function init() {
-    const sysLang = navigator.language.split('-')[0];
+    const sysLangFull = navigator.language || navigator.userLanguage;
+    const sysLang = sysLangFull.split('-')[0];
     const uiKey = uiTranslations[sysLang] ? sysLang : 'en';
+    
     applyUI(uiKey);
-    populateLanguageLists(uiKey);
+    populateLanguageLists(uiKey, sysLangFull);
 
-    const savedSrc = localStorage.getItem('srcLang') || (sysLang === 'pl' ? 'pl' : 'en');
+    // Sprawdzamy, czy język urządzenia znajduje się na naszej liście dozwolonych języków źródłowych
+    const isValidLang = languageData.some(l => l.code === sysLang);
+    const defaultSrc = isValidLang ? sysLang : 'en';
+
+    // Pobieramy z localStorage albo ustawiamy default
+    const savedSrc = localStorage.getItem('srcLang') || defaultSrc;
     const savedTgt = localStorage.getItem('tgtLang') || 'slo';
 
-    document.getElementById('srcLang').value = savedSrc;
-    document.getElementById('tgtLang').value = savedTgt;
+    const srcSelect = document.getElementById('srcLang');
+    const tgtSelect = document.getElementById('tgtLang');
+
+    if (srcSelect) {
+        srcSelect.value = savedSrc;
+        // Zapisywanie do localStorage i tłumaczenie po zmianie
+        srcSelect.addEventListener('change', (e) => {
+            localStorage.setItem('srcLang', e.target.value);
+            translate();
+        });
+    }
+    
+    if (tgtSelect) {
+        tgtSelect.value = savedTgt;
+        // Zapisywanie do localStorage i tłumaczenie po zmianie
+        tgtSelect.addEventListener('change', (e) => {
+            localStorage.setItem('tgtLang', e.target.value);
+            translate();
+        });
+    }
 
     await loadDictionaries();
-    document.getElementById('userInput').addEventListener('input', debounce(() => translate(), 300));
+    
+    const userInput = document.getElementById('userInput');
+    if (userInput) {
+        userInput.addEventListener('input', debounce(() => translate(), 300));
+    }
 }
 
 function applyUI(lang) {
@@ -266,13 +295,44 @@ function applyUI(lang) {
     if (input) input.placeholder = ui.placeholder;
 }
 
-function populateLanguageLists(uiLang) {
+function populateLanguageLists(uiLang, userLocale) {
     const srcSelect = document.getElementById('srcLang');
     const tgtSelect = document.getElementById('tgtLang');
     if (!srcSelect || !tgtSelect) return;
-    srcSelect.options.length = 0; tgtSelect.options.length = 0;
+    
+    srcSelect.options.length = 0; 
+    tgtSelect.options.length = 0;
+
+    // Próba wczytania systemowego tłumacza nazw (nowoczesne API)
+    let displayNames;
+    try {
+        displayNames = new Intl.DisplayNames([userLocale], { type: 'language' });
+    } catch (e) {
+        // Ignorujemy błąd, aplikacja ma "plan B" poniżej
+    }
+
     languageData.forEach(lang => {
-        const name = lang[uiLang] || lang.en;
+        let name = "";
+        
+        // Zawsze chronimy niestandardowy język słowiański
+        if (lang.code === 'slo') {
+            name = lang.slo || "Slověnьsky"; 
+        } 
+        // Jeśli przeglądarka obsługuje automatyczne nazwy języków
+        else if (displayNames) {
+            try {
+                let translatedName = displayNames.of(lang.code);
+                name = translatedName.charAt(0).toUpperCase() + translatedName.slice(1); // Zawsze z wielkiej litery
+            } catch (e) {
+                // Jeśli kod języka z jakiegoś powodu wyrzuci błąd w API, bierzemy z naszej bazy
+                name = lang[uiLang] || lang.en || lang.code; 
+            }
+        } 
+        // W starszych przeglądarkach korzystamy z ręcznie wpisanych nazw (fallback)
+        else {
+            name = lang[uiLang] || lang.en || lang.code;
+        }
+
         srcSelect.add(new Option(name, lang.code));
         tgtSelect.add(new Option(name, lang.code));
     });
@@ -282,8 +342,11 @@ function swapLanguages() {
     const src = document.getElementById('srcLang');
     const tgt = document.getElementById('tgtLang');
     [src.value, tgt.value] = [tgt.value, src.value];
+    
+    // Zapamiętywanie nowych wartości w Local Storage po zamianie miejscami
     localStorage.setItem('srcLang', src.value);
     localStorage.setItem('tgtLang', tgt.value);
+    
     translate();
 }
 
