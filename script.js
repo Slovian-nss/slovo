@@ -2,6 +2,7 @@ let plToSlo = {}, sloToPl = {};
 let wordTypes = {};
 
 const languageData = [
+    // Twoje oryginalne wpisy (bez zmian)
     { code: 'slo', pl: 'Słowiański', en: 'Slovian (Slavic)', slo: 'Slověnьsky', de: 'Slawisch' },
     { code: 'en', pl: 'Angielski', en: 'English', slo: "Angol'ьsky", de: 'Englisch' },
     { code: 'pl', pl: 'Polski', en: 'Polish', slo: "Pol'ьsky", de: 'Polnisch' },
@@ -18,7 +19,7 @@ const languageData = [
     { code: 'am', pl: 'Amharski', en: 'Amharic', slo: 'Amharьsky', de: 'Amharisch' },
     { code: 'ar', pl: 'Arabski', en: 'Arabic', slo: 'Arabьsky', de: 'Arabisch' },
     { code: 'az', pl: 'Azerbejdżański', en: 'Azerbaijani', slo: "Azerbed'ěnьsky", de: 'Aserbaidschanisch' },
-    { code: 'bn', pl: 'Bengalski', en: 'Bengali', slo: 'Bengalьsky', de: 'Bengalisch' },
+    { code: 'bn', pl: 'Bengalski', en: 'Bengali', slo: 'Bengalьsky', de: 'Bengalis' },
     { code: 'be', pl: 'Białoruski', en: 'Belarusian', slo: 'Bělorusьsky', de: 'Weißrussisch' },
     { code: 'bg', pl: 'Bułgarski', en: 'Bulgarian', slo: "Boulgar'ьsky", de: 'Bulgarisch' },
     { code: 'ca', pl: 'Kataloński', en: 'Catalan', slo: "Katalonьsky", de: 'Katalanisch' },
@@ -35,7 +36,7 @@ const languageData = [
     { code: 'hu', pl: 'Węgierski', en: 'Hungarian', slo: 'Ǫgrinьsky', de: 'Ungarisch' },
     { code: 'is', pl: 'Islandzki', en: 'Icelandic', slo: 'Ledozemьsky', de: 'Isländisch' },
     { code: 'id', pl: 'Indonezyjski', en: 'Indonesian', slo: 'Indonezijьsky', de: 'Indonesisch' },
-    { code: 'ga', pl: 'Irlandzki', en: 'Irish', slo: 'Irьski', de: 'Irisch' },
+    { code: 'ga', pl: 'Irlandzki', en: 'Irish', slo: 'Irьsky', de: 'Irisch' },
     { code: 'ja', pl: 'Japoński', en: 'Japanese', slo: 'Japonьsky', de: 'Japanisch' },
     { code: 'ko', pl: 'Koreański', en: 'Korean', slo: 'Koreanьsky', de: 'Koreanisch' },
     { code: 'lv', pl: 'Łotewski', en: 'Latvian', slo: 'Latyšьsky', de: 'Lettisch' },
@@ -50,27 +51,59 @@ const languageData = [
     { code: 'sv', pl: 'Szwedzki', en: 'Swedish', slo: 'Švedьsky', de: 'Schwedisch' },
     { code: 'th', pl: 'Tajski', en: 'Thai', slo: 'Tajьsky', de: 'Thailändisch' },
     { code: 'tr', pl: 'Turecki', en: 'Turkish', slo: 'Turečьsky', de: 'Türkisch' },
-    { code: 'vi', pl: 'Wietnamski', en: 'Vietnamese', slo: 'Větnamьsky', de: 'Vietnamesisch' }
+    { code: 'vi', pl: 'Wietnamski', en: 'Vietnamese', slo: 'Větnamьsky', de: 'Vietnamesisch' },
+    // Dopisane pozostałe języki Google Translate
+    { code: 'hy', pl: 'Ormiański', en: 'Armenian', slo: 'Armenьsky', de: 'Armenisch' },
+    { code: 'eu', pl: 'Baskijski', en: 'Basque', slo: 'Baskьsky', de: 'Baskisch' },
+    { code: 'bs', pl: 'Bośniacki', en: 'Bosnian', slo: 'Bosnьsky', de: 'Bosnisch' },
+    { code: 'cy', pl: 'Walijski', en: 'Welsh', slo: 'Valijьsky', de: 'Walisisch' },
+    { code: 'eo', pl: 'Esperanto', en: 'Esperanto', slo: 'Esperanto', de: 'Esperanto' },
+    { code: 'ka', pl: 'Gruziński', en: 'Georgian', slo: 'Gruzinьsky', de: 'Georgisch' },
+    { code: 'gu', pl: 'Gudżarati', en: 'Gujarati', slo: 'Gudžaratьsky', de: 'Gujarati' },
+    { code: 'ha', pl: 'Hausa', en: 'Hausa', slo: 'Hausa', de: 'Hausa' },
+    { code: 'he', pl: 'Hebrajski', en: 'Hebrew', slo: 'Hebrějskьsky', de: 'Hebräisch' },
+    { code: 'iw', pl: 'Hebrajski (stary kod)', en: 'Hebrew', slo: 'Hebrějskьsky', de: 'Hebräisch' },
+    { code: 'ig', pl: 'Igbo', en: 'Igbo', slo: 'Igbo', de: 'Igbo' },
+    { code: 'jw', pl: 'Jawajski', en: 'Javanese', slo: 'Javanьsky', de: 'Javanisch' },
+    { code: 'kn', pl: 'Kannada', en: 'Kannada', slo: 'Kannada', de: 'Kannada' },
+    { code: 'kk', pl: 'Kazachski', en: 'Kazakh', slo: 'Kazahьsky', de: 'Kasachisch' },
+    { code: 'km', pl: 'Khmer', en: 'Khmer', slo: 'Khmer', de: 'Khmer' },
+    { code: 'lo', pl: 'Laotański', en: 'Lao', slo: 'Laosьsky', de: 'Laotisch' },
+    { code: 'la', pl: 'Łacina', en: 'Latin', slo: 'Latinьsky', de: 'Latein' },
+    { code: 'mt', pl: 'Maltański', en: 'Maltese', slo: 'Maltanьsky', de: 'Maltesisch' },
+    { code: 'mi', pl: 'Maoryski', en: 'Maori', slo: 'Maori', de: 'Maori' },
+    { code: 'mr', pl: 'Marathi', en: 'Marathi', slo: 'Marathi', de: 'Marathi' },
+    { code: 'mn', pl: 'Mongolski', en: 'Mongolian', slo: 'Mongolьsky', de: 'Mongolisch' },
+    { code: 'ne', pl: 'Nepalski', en: 'Nepali', slo: 'Nepalьsky', de: 'Nepalesisch' },
+    { code: 'pa', pl: 'Pendżabski', en: 'Punjabi', slo: 'Pendžabьsky', de: 'Panjabi' },
+    { code: 'fa', pl: 'Perski', en: 'Persian', slo: 'Persьsky', de: 'Persisch' },
+    { code: 'so', pl: 'Somalijski', en: 'Somali', slo: 'Somalьsky', de: 'Somali' },
+    { code: 'sw', pl: 'Suahili', en: 'Swahili', slo: 'Suahili', de: 'Suaheli' },
+    { code: 'ta', pl: 'Tamilski', en: 'Tamil', slo: 'Tamilьsky', de: 'Tamilisch' },
+    { code: 'te', pl: 'Telugu', en: 'Telugu', slo: 'Telugu', de: 'Telugu' },
+    { code: 'ur', pl: 'Urdu', en: 'Urdu', slo: 'Urdu', de: 'Urdu' },
+    { code: 'zu', pl: 'Zuluski', en: 'Zulu', slo: 'Zulu', de: 'Zulu' }
 ];
 
 const uiTranslations = {
+    // Twoje oryginalne (bez zmian)
     slo: { title: "Slovo Perkladačь", from: "Jiz ęzyka:", to: "Na ęzyk:", paste: "Vyloži", clear: "Terbi", copy: "Poveli", placeholder: "Piši tu..." },
     pl: { title: "Slovo Tłumacz", from: "Z języka:", to: "Na język:", paste: "Wklej", clear: "Usuń", copy: "Kopiuj", placeholder: "Wpisz tekst..." },
     en: { title: "Slovo Translator", from: "From language:", to: "To language:", paste: "Paste", clear: "Clear", copy: "Copy", placeholder: "Type here..." },
     de: { title: "Slovo Übersetzer", from: "Von:", to: "Nach:", paste: "Einfügen", clear: "Löschen", copy: "Kopieren", placeholder: "Text eingeben..." },
     fr: { title: "Traducteur Slovo", from: "De :", to: "Vers :", paste: "Coller", clear: "Effacer", copy: "Copier", placeholder: "Entrez le texte..." },
     es: { title: "Traductor Slovo", from: "De:", to: "A:", paste: "Pegar", clear: "Borrar", copy: "Copiar", placeholder: "Escribe texto..." },
-    it: { title: "Traduttore Slovo", from: "Da:", to: "A:", paste: "Incolla", clear: "Cancella", copy: "Copia", placeholder: "Inserisci testo..." },
+    it: { title: "Traduttore Slovo", from: "Da:", to: "A:", paste: "Incolla", clear: "Cancella", copy: "Copia", placeholder: "Inserisci tekst..." },
     pt: { title: "Tradutor Slovo", from: "De:", to: "Para:", paste: "Colar", clear: "Limpar", copy: "Copiar", placeholder: "Digite o texto..." },
     nl: { title: "Slovo Vertaler", from: "Van:", to: "Naar:", paste: "Plakken", clear: "Wissen", copy: "Kopiëren", placeholder: "Voer tekst in..." },
     sv: { title: "Slovo Översättare", from: "Från:", to: "Till:", paste: "Klistra in", clear: "Rensa", copy: "Kopiera", placeholder: "Skriv text..." },
-    no: { title: "Slovo Oversetter", from: "Fra:", to: "Til:", paste: "Lim inn", clear: "Fjern", copy: "Kopier", placeholder: "Skriv tekst..." },
+    no: { title: "Slovo Oversetter", from: "Fra:", to: "Till:", paste: "Lim inn", clear: "Fjern", copy: "Kopier", placeholder: "Skriv tekst..." },
     da: { title: "Slovo Oversætter", from: "Fra:", to: "Til:", paste: "Indsæt", clear: "Ryd", copy: "Kopiér", placeholder: "Indtast tekst..." },
     fi: { title: "Slovo Kääntäjä", from: "Lähde:", to: "Kohde:", paste: "Liitä", clear: "Tyhjennä", copy: "Kopioi", placeholder: "Kirjoita teksti..." },
     ru: { title: "Slovo Переводчик", from: "С языка:", to: "На язык:", paste: "Вставить", clear: "Очистить", copy: "Копировать", placeholder: "Введите текст..." },
-    uk: { title: "Slovo Перекладач", from: "З мови:", to: "На мову:", paste: "Вставити", clear: "Очистити", copy: "Копіювати", placeholder: "Введіть текст..." },
+    uk: { title: "Slovo Перекладач", from: "З мови:", to: "На мову:", paste: "Вставити", clear: "Очистіть", copy: "Копіювати", placeholder: "Введіть текст..." },
     cs: { title: "Slovo Překladač", from: "Z jazyka:", to: "Do jazyka:", paste: "Vložit", clear: "Vymazat", copy: "Kopírovat", placeholder: "Zadejte text..." },
-    sk: { title: "Slovo Prekladač", from: "Z jazyka:", to: "Do jazyka:", paste: "Vložiť", clear: "Vymazať", copy: "Kopírovat", placeholder: "Zadajte text..." },
+    sk: { title: "Slovo Prekladač", from: "Z jazyka:", to: "Do jazyka:", paste: "Vložiť", clear: "Vymazať", copy: "Kopírovať", placeholder: "Zadajte text..." },
     sl: { title: "Slovo Prevajalnik", from: "Iz:", to: "V:", paste: "Prilepi", clear: "Počisti", copy: "Kopiraj", placeholder: "Vnesi besedilo..." },
     hr: { title: "Slovo Prevoditelj", from: "Iz:", to: "U:", paste: "Zalijepi", clear: "Obriši", copy: "Kopiraj", placeholder: "Unesi tekst..." },
     sr: { title: "Slovo Преводилац", from: "Са:", to: "На:", paste: "Налепи", clear: "Обриши", copy: "Копирај", placeholder: "Унеси текст..." },
@@ -82,7 +115,24 @@ const uiTranslations = {
     zh: { title: "Slovo 翻译器", from: "从:", to: "到:", paste: "粘贴", clear: "清除", copy: "复制", placeholder: "输入文本..." },
     ja: { title: "Slovo 翻訳", from: "元の言語:", to: "翻訳先:", paste: "貼り付け", clear: "クリア", copy: "コピー", placeholder: "テキストを入力..." },
     ko: { title: "Slovo 번역기", from: "출발:", to: "도착:", paste: "붙여넣기", clear: "지우기", copy: "복사", placeholder: "텍스트 입력..." },
-    ar: { title: "مترجم Slovo", from: "من:", to: "إلى:", paste: "لصق", clear: "مسح", copy: "نسخ", placeholder: "أدخل النص..." }
+    ar: { title: "مترجم Slovo", from: "من:", to: "إلى:", paste: "لصق", clear: "مسح", copy: "نسخ", placeholder: "أدخل النص..." },
+
+    // Nowe tłumaczenia interfejsu dla pozostałych języków z Twojej listy:
+    af: { title: "Slovo Vertaler", from: "Van taal:", to: "Na taal:", paste: "Plak", clear: "Vee uit", copy: "Kopieer", placeholder: "Tik hier..." },
+    sq: { title: "Slovo Përkthyesi", from: "Nga gjuha:", to: "Në gjuhën:", paste: "Ngjit", clear: "Pastro", copy: "Kopjo", placeholder: "Shkruaj këtu..." },
+    am: { title: "Slovo አስተርጓሚ", from: "ከቋንቋ:", to: "ወደ ቋንቋ:", paste: "ለጥፍ", clear: "አጽዳ", copy: "ቅዳ", placeholder: "እዚህ ይፃፉ..." },
+    az: { title: "Slovo Tərcüməçi", from: "Dildən:", to: "Dilə:", paste: "Yapışdır", clear: "Təmizlə", copy: "Kopyala", placeholder: "Bura yazın..." },
+    bn: { title: "Slovo অনুবাদক", from: "ভাষা থেকে:", to: "ভাষা পর্যন্ত:", paste: "পেস্ট", clear: "পরিষ্কার", copy: "কপি", placeholder: "এখানে লিখুন..." },
+    ca: { title: "Traductor Slovo", from: "De la llengua:", to: "A la llengua:", paste: "Enganxa", clear: "Neteja", copy: "Copia", placeholder: "Escriu aquí..." },
+    et: { title: "Slovo Tõlkija", from: "Keelest:", to: "Keelde:", paste: "Kleebi", clear: "Puhasta", copy: "Kopeeri", placeholder: "Sisesta tekst..." },
+    gl: { title: "Tradutor Slovo", from: "Do idioma:", to: "Ao idioma:", paste: "Pegar", clear: "Limpar", copy: "Copiar", placeholder: "Escribe aquí..." },
+    hi: { title: "Slovo अनुवादक", from: "भाषा से:", to: "भाषा तक:", paste: "पेस्ट करें", clear: "साफ़ करें", copy: "कॉपी करें", placeholder: "यहाँ लिखें..." },
+    id: { title: "Penerjemah Slovo", from: "Dari bahasa:", to: "Ke bahasa:", paste: "Tempel", clear: "Bersihkan", copy: "Salin", placeholder: "Ketik di sini..." },
+    ga: { title: "Slovo Aistritheoir", from: "Ó theanga:", to: "Go teanga:", paste: "Greamaigh", clear: "Glan", copy: "Cóipeáil", placeholder: "Scríobh anseo..." },
+    lv: { title: "Slovo Tulkotājs", from: "No valodas:", to: "Uz valodu:", paste: "Ielīmēt", clear: "Notīrīt", copy: "Kopēt", placeholder: "Ievadiet tekstu..." },
+    lt: { title: "Slovo Vertėjas", from: "Iš kalbos:", to: "Į kalbą:", paste: "Įklijuoti", clear: "Išvalyti", copy: "Kopijuoti", placeholder: "Įveskite tekstą..." },
+    ms: { title: "Penterjemah Slovo", from: "Daripada bahasa:", to: "Kepada bahasa:", paste: "Tampal", clear: "Padam", copy: "Salin", placeholder: "Taip di sini..." },
+    vi: { title: "Slovo Phiên dịch", from: "Từ ngôn ngữ:", to: "Sang ngôn ngữ:", paste: "Dán", clear: "Xóa", copy: "Sao chép", placeholder: "Nhập văn bản..." }
 };
 
 // --- FUNKCJE WIELKOŚCI LITER ---
