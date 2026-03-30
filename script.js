@@ -135,35 +135,73 @@ function reorderSmart(text) {
         let token = tokens[i];
         let lowToken = token.toLowerCase();
 
+        // Jeśli to znak interpunkcyjny lub spacja, dodaj i idź dalej
         if (/^[\s.,!?;:()=+\-%*/]+$/.test(token)) {
             result.push(token);
             continue;
         }
 
+        // --- SZUKANIE KOLEJNYCH SŁÓW (ignorując spacje) ---
         let nextIdx = i + 1;
         while (nextIdx < tokens.length && /^[\s]+$/.test(tokens[nextIdx])) nextIdx++;
+        
+        let thirdIdx = nextIdx + 1;
+        while (thirdIdx < tokens.length && /^[\s]+$/.test(tokens[thirdIdx])) thirdIdx++;
 
+        // --- OPCJA A: TRZY SŁOWA (Rzeczownik + Przymiotnik + Liczebnik lub inne kombinacje) ---
+        // Jeśli mamy 3 słowa i jednym z nich jest rzeczownik, a pozostałe to przymiotnik i liczebnik
+        if (thirdIdx < tokens.length) {
+            let t1 = lowToken;
+            let t2 = tokens[nextIdx].toLowerCase();
+            let t3 = tokens[thirdIdx].toLowerCase();
+
+            const words = [
+                { val: token, type: wordTypes[t1], idx: i },
+                { val: tokens[nextIdx], type: wordTypes[t2], idx: nextIdx },
+                { val: tokens[thirdIdx], type: wordTypes[t3], idx: thirdIdx }
+            ];
+
+            const hasNoun = words.find(w => w.type === "noun");
+            const hasAdj = words.find(w => w.type === "adjective");
+            const hasNum = words.find(w => w.type === "numeral");
+
+            if (hasNoun && hasAdj && hasNum) {
+                const firstCase = getCase(token);
+
+                // Kolejność: 1. Liczebnik, 2. Przymiotnik, 3. Rzeczownik
+                result.push(applyCase(hasNum.val, firstCase));
+                result.push(" "); // Dodajemy spację
+                result.push(hasAdj.val.toLowerCase());
+                result.push(" "); // Dodajemy spację
+                result.push(firstCase === "upper" ? hasNoun.val.toUpperCase() : hasNoun.val.toLowerCase());
+
+                i = thirdIdx; // Przeskakujemy przetworzone słowa
+                continue;
+            }
+        }
+
+        // --- OPCJA B: DWA SŁOWA (Rzeczownik + Przymiotnik LUB Rzeczownik + Liczebnik) ---
         if (nextIdx < tokens.length) {
             let nextToken = tokens[nextIdx];
             let nextLow = nextToken.toLowerCase();
 
-            // Rzeczownik + (Przymiotnik lub Liczebnik)
             if (wordTypes[lowToken] === "noun" && (wordTypes[nextLow] === "adjective" || wordTypes[nextLow] === "numeral")) {
                 const firstCase = getCase(token);
                 
-                // Przymiotnik na przód z wielkością liter pierwotnego pierwszego słowa
+                // Liczebnik lub Przymiotnik na przód
                 result.push(applyCase(nextToken, firstCase));
                 
-                // Zachowanie spacji między słowami
+                // Spacja
                 for (let j = i + 1; j < nextIdx; j++) result.push(tokens[j]);
                 
-                // Rzeczownik na drugie miejsce (małą literą, chyba że pierwotnie był ALL CAPS)
+                // Rzeczownik na koniec
                 result.push(firstCase === "upper" ? token.toUpperCase() : token.toLowerCase());
                 
                 i = nextIdx;
                 continue;
             }
         }
+
         result.push(token);
     }
     return result.join("");
