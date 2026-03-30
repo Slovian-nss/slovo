@@ -154,52 +154,70 @@ function reorderSmart(text) {
     if (!text) return "";
     const tokens = text.split(/(\s+|[.,!?;:()=+\-%*/]+)/g).filter(t => t !== "" && t !== undefined);
     const result = [];
+
     for (let i = 0; i < tokens.length; i++) {
         let token = tokens[i];
         let lowToken = token.toLowerCase();
+
+        // Jeśli to nie jest słowo (tylko spacja lub interpunkcja), dodaj i idź dalej
         if (/^[\s.,!?;:()=+\-%*/]+$/.test(token)) {
             result.push(token);
             continue;
         }
-        let nextIdx = i + 1;
-        while (nextIdx < tokens.length && /^[\s]+$/.test(tokens[nextIdx])) nextIdx++;
-        let thirdIdx = nextIdx + 1;
-        while (thirdIdx < tokens.length && /^[\s]+$/.test(tokens[thirdIdx])) thirdIdx++;
-        if (thirdIdx < tokens.length) {
-            let t1 = lowToken;
-            let t2 = tokens[nextIdx].toLowerCase();
-            let t3 = tokens[thirdIdx].toLowerCase();
-            const words = [
-                { val: token, type: wordTypes[t1], idx: i },
-                { val: tokens[nextIdx], type: wordTypes[t2], idx: nextIdx },
-                { val: tokens[thirdIdx], type: wordTypes[t3], idx: thirdIdx }
-            ];
-            const hasNoun = words.find(w => w.type === "noun");
-            const hasAdj = words.find(w => w.type === "adjective");
-            const hasNum = words.find(w => w.type === "numeral");
-            if (hasNoun && hasAdj && hasNum) {
-                const firstCase = getCase(token);
-                result.push(applyCase(hasNum.val, firstCase));
-                result.push(" ");
-                result.push(hasAdj.val.toLowerCase());
-                result.push(" ");
-                result.push(firstCase === "upper" ? hasNoun.val.toUpperCase() : hasNoun.val.toLowerCase());
-                i = thirdIdx;
+
+        // Sprawdzamy, czy obecne słowo to rzeczownik, przymiotnik lub liczebnik
+        if (wordTypes[lowToken]) {
+            let group = [];
+            let currentIdx = i;
+            let firstWordCase = getCase(tokens[i]);
+
+            // Zbieraj wszystkie powiązane słowa występujące po sobie (ignorując spacje)
+            while (currentIdx < tokens.length) {
+                let currentToken = tokens[currentIdx];
+                let currentLow = currentToken.toLowerCase();
+
+                if (/^[\s]+$/.test(currentToken)) {
+                    currentIdx++;
+                    continue;
+                }
+
+                let type = wordTypes[currentLow];
+                if (type === "noun" || type === "adjective" || type === "numeral") {
+                    group.push({ val: currentToken, type: type });
+                    i = currentIdx; // Przesuwamy główny licznik pętli
+                    currentIdx++;
+                } else {
+                    break; 
+                }
+            }
+
+            if (group.length > 1) {
+                // Sortujemy grupę według klucza: 1. numeral, 2. adjective, 3. noun
+                const order = { "numeral": 1, "adjective": 2, "noun": 3 };
+                group.sort((a, b) => (order[a.type] || 99) - (order[b.type] || 99));
+
+                // Składamy grupę z powrotem w całość
+                group.forEach((word, index) => {
+                    let formattedWord = word.val.toLowerCase();
+                    
+                    // Pierwsze słowo w nowym szyku dostaje wielkość liter pierwotnego pierwszego słowa
+                    if (index === 0) {
+                        formattedWord = applyCase(word.val, firstWordCase);
+                    } else if (firstWordCase === "upper") {
+                        formattedWord = word.val.toUpperCase();
+                    }
+
+                    result.push(formattedWord);
+                    if (index < group.length - 1) result.push(" ");
+                });
+                continue;
+            } else if (group.length === 1) {
+                // Jeśli grupa ma tylko 1 słowo, nic nie zmieniaj
+                result.push(token);
                 continue;
             }
         }
-        if (nextIdx < tokens.length) {
-            let nextToken = tokens[nextIdx];
-            let nextLow = nextToken.toLowerCase();
-            if (wordTypes[lowToken] === "noun" && (wordTypes[nextLow] === "adjective" || wordTypes[nextLow] === "numeral")) {
-                const firstCase = getCase(token);
-                result.push(applyCase(nextToken, firstCase));
-                for (let j = i + 1; j < nextIdx; j++) result.push(tokens[j]);
-                result.push(firstCase === "upper" ? token.toUpperCase() : token.toLowerCase());
-                i = nextIdx;
-                continue;
-            }
-        }
+
         result.push(token);
     }
     return result.join("");
