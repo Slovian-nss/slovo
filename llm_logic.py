@@ -12,106 +12,113 @@ def load_json(filename):
     return []
 
 def save_json(data, filename):
-    # Sortowanie osnova.json dla porządku w Arkuszach Google
     if filename == 'osnova.json':
         data = sorted(data, key=lambda x: x.get('polish', '').lower())
     with open(filename, 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
-def extract_grammar_info(type_and_case):
+def parse_vuzor_tags(tag_string):
     """
-    Analizuje Twoje opisy w stylu: 
-    'noun - jimenьnik: "obětьnica" | accusative - vinьnik | singular | type feminine'
+    Analizuje Twoje tagi: 'noun - jimenьnik: "obětьnica" | genitive | plural | type feminine'
     """
-    parts = [p.strip().lower() for p in type_and_case.split('|')]
+    tag_string = tag_string.lower()
     info = {
-        "pos": "noun" if "noun" in parts[0] else "adj" if "adjective" in parts[0] else "other",
         "case": "nom",
         "num": "sg",
         "gender": "masc"
     }
     
     # Mapowanie przypadków
-    case_map = {
-        "nominative": "nom", "accusative": "acc", "genitive": "gen",
-        "locative": "loc", "dative": "dat", "instrumental": "ins"
-    }
-    for k, v in case_map.items():
-        if any(k in p for p in parts):
-            info["case"] = v
+    cases = {"nominative": "nom", "accusative": "acc", "genitive": "gen", 
+             "locative": "loc", "dative": "dat", "instrumental": "ins"}
+    for k, v in cases.items():
+        if k in tag_string: info["case"] = v
             
-    if any("plural" in p for p in parts): info["num"] = "pl"
-    if any("feminine" in p for p in parts): info["gender"] = "fem"
-    elif any("neuter" in p for p in parts): info["gender"] = "neut"
+    if "plural" in tag_string: info["num"] = "pl"
+    if "feminine" in tag_string: info["gender"] = "fem"
+    elif "neuter" in tag_string: info["gender"] = "neut"
     
     return info
 
-def get_vuzor_pattern(word_type_info):
+def get_ending(slovian_word):
+    """Wyciąga końcówkę (ostatnie 1-2 znaki)"""
+    vowels = "aoyěęǫъьiue"
+    if len(slovian_word) > 1 and slovian_word[-1] in vowels:
+        if len(slovian_word) > 2 and slovian_word[-2] in vowels:
+            return slovian_word[-2:]
+        return slovian_word[-1]
+    return ""
+
+def learn_grammar_from_vuzor():
     """
-    Przeszukuje vuzor.json w poszukiwaniu końcówek dla danego typu gramatycznego.
+    Kluczowa funkcja: analizuje vuzor.json i tworzy mapę końcówek.
     """
     vuzor_data = load_json('vuzor.json')
-    patterns = {}
-    
+    grammar_map = {} # { "noun_masc": { "pl_gen": "ovъ" } }
+
     for entry in vuzor_data:
-        info = extract_grammar_info(entry.get('type and case', ''))
-        # Szukamy słów o tym samym typie co nasze docelowe
-        if info['pos'] == word_type_info['pos'] and info['gender'] == word_type_info['gender']:
-            # Wyciągamy końcówkę (uproszczone: ostatnie 1-2 litery)
-            s_word = entry.get('slovian', '')
-            if s_word:
-                key = f"{info['num']}_{info['case']}"
-                # Tutaj silnik uczy się wzorca z pliku vuzor.json
-                patterns[key] = s_word[-1] if s_word[-1] in ['a', 'o', 'e', 'y', 'ǫ', 'ъ', 'ь'] else s_word[-2:]
-    return patterns
+        tags = parse_vuzor_tags(entry.get('type and case', ''))
+        s_word = entry.get('slovian', '')
+        
+        if not s_word: continue
+        
+        # Określamy typ (uproszczony)
+        w_type = f"noun_{tags['gender']}"
+        if w_type not in grammar_map: grammar_map[w_type] = {}
+        
+        # Zapisujemy końcówkę dla danego przypadku i liczby
+        key = f"{tags['num']}_{tags['case']}"
+        grammar_map[w_type][key] = get_ending(s_word)
+        
+    return grammar_map
 
 def learn_from_examples():
-    """
-    Główny silnik: bierze example_sentences.json i aktualizuje osnova.json.
-    """
+    """Uczy się rdzeni z example_sentences.json"""
     examples = load_json('example_sentences.json')
     osnova = load_json('osnova.json')
-    
     existing_polish = {item.get('polish', '').lower(): item for item in osnova}
-    
+
     for ex in examples:
         p_word = ex.get('polish', '').lower().strip()
         s_word = ex.get('slovian', '').strip()
         
         if p_word and s_word and p_word not in existing_polish:
-            # Automatyczne odcięcie końcówki bazy
-            stem = s_word[:-1] if s_word[-1] in ['ъ', 'a', 'o', 'e', 'ь'] else s_word
+            # Automatyczne wyznaczanie rdzenia (stem)
+            stem = s_word
+            for end in ['ъ', 'a', 'o', 'e', 'ь']:
+                if s_word.endswith(end):
+                    stem = s_word[:-len(end)]
+                    break
             
-            new_entry = {
+            osnova.append({
                 "polish": p_word,
                 "slovian": s_word,
                 "stem": stem,
-                "type": "noun_masc" if "ъ" in s_word[-1:] else "noun_fem",
+                "type": "noun_masc" if s_word.endswith('ъ') else "noun_fem" if s_word.endswith('a') else "noun_neut",
                 "context": ex.get("context", "")
-            }
-            osnova.append(new_entry)
-            print(f"Silnik: Nauczyłem się słowa '{p_word}' (rdzeń: {stem})")
-            
+            })
+    
     save_json(osnova, 'osnova.json')
 
-def translate_sentence(sentence):
+def translate_with_grammar(polish_word, target_case='gen', target_num='pl'):
     """
-    Próbuje odmienić słowa, których brakuje, korzystając ze wzorców.
+    Główna funkcja translatora: łączy rdzeń z końcówką z vuzora.
     """
     osnova = load_json('osnova.json')
-    words = sentence.split()
-    translated = []
+    grammar = learn_grammar_from_vuzor()
     
-    for w in words:
-        # Szukamy bazy słowa
-        match = next((i for i in osnova if i['polish'] == w.lower()), None)
-        if match and 'stem' in match:
-            # Tutaj można dodać logikę wyboru przypadku na podstawie sąsiednich słów
-            translated.append(match['slovian'])
-        else:
-            translated.append(w) # Fallback do oryginału
-            
-    return " ".join(translated)
+    match = next((i for i in osnova if i['polish'].lower() == polish_word.lower()), None)
+    
+    if match and 'stem' in match:
+        w_type = match.get('type', 'noun_masc')
+        key = f"{target_num}_{target_case}"
+        
+        # Jeśli mamy końcówkę w vuzorze, doklejamy ją
+        if w_type in grammar and key in grammar[w_type]:
+            return match['stem'] + grammar[w_type][key]
+        
+    return polish_word # Fallback
 
 if __name__ == "__main__":
     learn_from_examples()
+    # Przykład użycia: print(translate_with_grammar("dom", "gen", "pl")) -> "domovъ"
