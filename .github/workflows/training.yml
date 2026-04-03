@@ -5,22 +5,17 @@ on:
     paths:
       - '**.json'
 
-# To jest najważniejsza część, która rozwiązuje błąd 128
 permissions:
   contents: write
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    
-    # Wymuszenie Node.js 24, o którym wspomina komunikat w logach
-    env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
+          token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
 
       - name: Set up Python
@@ -32,18 +27,15 @@ jobs:
         run: python app.py
 
       - name: Save Changes
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          git config --global user.name 'SlovianBot'
+          git config --local user.name 'SlovianBot'
           git config --global user.email 'bot@slovian.org'
           
           if [ -f osnova.json ]; then
             git add osnova.json
-            # Jeśli nie ma zmian, skrypt po prostu skończy pracę bez błędu
             git commit -m "Auto-clean dictionary: $(date +'%Y-%m-%d %H:%M')" || exit 0
-            git push https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git HEAD:${{ github.ref_name }}
+            git push origin HEAD:${{ github.ref_name }}
           else
-            echo "BŁĄD: Plik osnova.json nie istnieje. Upewnij się, że app.py go tworzy."
+            echo "Plik osnova.json nie istnieje!"
             exit 1
           fi
