@@ -2,264 +2,124 @@ import json
 import os
 from collections import defaultdict
 
-# ========================
-# 📂 IO
-# ========================
-
 def load_data(file):
     if os.path.exists(file):
         with open(file, 'r', encoding='utf-8') as f:
             return json.load(f)
     return []
 
-# ========================
-# 🔤 LEVENSHTEIN
-# ========================
-
-def levenshtein(a, b):
-    dp = [[i + j if i * j == 0 else 0 for j in range(len(b) + 1)] for i in range(len(a) + 1)]
-
-    for i in range(1, len(a) + 1):
-        for j in range(1, len(b) + 1):
-            cost = 0 if a[i-1] == b[j-1] else 1
-            dp[i][j] = min(
-                dp[i-1][j] + 1,
-                dp[i][j-1] + 1,
-                dp[i-1][j-1] + cost
-            )
-    return dp[-1][-1]
-
-# ========================
-# 🧠 TAGI
-# ========================
-
 def detect_case(tag):
     tag = tag.lower()
-    if "nominative" in tag: return "nom"
-    if "genitive" in tag: return "gen"
-    if "accusative" in tag: return "acc"
-    if "locative" in tag: return "loc"
-    if "dative" in tag: return "dat"
-    if "instrumental" in tag: return "ins"
+    if any(x in tag for x in ["nominative", "jimenovьnik"]): return "nom"
+    if any(x in tag for x in ["genitive", "rodilьnik"]): return "gen"
+    if any(x in tag for x in ["accusative", "vinьnik"]): return "acc"
+    if any(x in tag for x in ["locative", "městьnik"]): return "loc"
+    if any(x in tag for x in ["dative", "měrьnik"]): return "dat"
+    if any(x in tag for x in ["instrumental", "orǫdьnik"]): return "ins"
     return "nom"
 
 def detect_number(tag):
-    return "pl" if "plural" in tag else "sg"
+    return "pl" if any(x in tag for x in ["plural", "munoga ličьba"]) else "sg"
 
-def extract_lemma(tag, fallback):
+def extract_lemma(tag, slovian):
     if '"' in tag:
-        return tag.split('"')[1]
-    return fallback
-
-# ========================
-# 🧱 RDZEŃ
-# ========================
-
-def longest_common_prefix(words):
-    if not words:
-        return ""
-    prefix = words[0]
-    for w in words[1:]:
-        i = 0
-        while i < len(prefix) and i < len(w) and prefix[i] == w[i]:
-            i += 1
-        prefix = prefix[:i]
-    return prefix
-
-# ========================
-# 🧠 KLASY
-# ========================
-
-def classify_lemma(word):
-    if word.endswith("a"):
-        return "fem"
-    if word.endswith(("o", "e")):
-        return "neut"
-    return "masc"
-
-# ========================
-# 🧠 MODELE
-# ========================
+        return tag.split('"')[1].strip()
+    return slovian.split()[0] if slovian else slovian
 
 def build_models():
     data = load_data("vuzor.json")
-    lemmas = defaultdict(list)
+    models = defaultdict(lambda: {"endings": {}, "class": "masc"})
 
     for e in data:
-        slov = e.get("slovian", "")
+        slov = e.get("slovian", "").strip()
         tag = e.get("type and case", "")
-
-        if not slov:
-            continue
-
+        if not slov: continue
         lemma = extract_lemma(tag, slov)
+        case = detect_case(tag)
+        num = detect_number(tag)
+        key = f"{num}_{case}"
+        models[lemma]["lemma"] = lemma
+        models[lemma]["endings"][key] = slov
+        if lemma.endswith("a"): models[lemma]["class"] = "fem"
+        elif lemma[-1] in "oe": models[lemma]["class"] = "neut"
 
-        lemmas[lemma].append({
-            "form": slov,
-            "case": detect_case(tag),
-            "num": detect_number(tag)
-        })
-
-    models = []
-
-    for lemma, forms in lemmas.items():
-        base_forms = [f["form"] for f in forms]
-        stem = longest_common_prefix(base_forms)
-
-        endings = {}
-        for f in forms:
-            key = f"{f['num']}_{f['case']}"
-            endings[key] = f["form"][len(stem):]
-
-        models.append({
-            "lemma": lemma,
-            "stem": stem,
-            "endings": endings,
-            "class": classify_lemma(lemma)
-        })
-
-    return models
+    return list(models.values())
 
 # ========================
-# 🧠 WYBÓR MODELU
+# Poprawione reguły dla "z"
 # ========================
+PREP_CASE = {
+    "v":  ("loc", "v"),      # w
+    "do": ("gen", "do"),
+    "na": ("loc", "na"),
+    "o":  ("loc", "o"),
+    "k":  ("dat", "k"),
+    "su": ("ins", "su"),     # z + narzędnik (z kimś)
+    "jiz":("gen", "jiz")     # z + dopełniacz (z kogoś/czegoś)
+}
 
-def find_model(word, models):
+def get_case_from_context(tokens, i):
+    word = tokens[i].lower()
+    
+    # Przyimek bezpośrednio przed
+    if i > 0:
+        prev = tokens[i-1].lower()
+        if prev in ("z", "ze"):
+            # Następne słowo decyduje (prosta heurystyka)
+            if i+1 < len(tokens) and tokens[i+1].lower() in ("kim", "czym", "nim", "nią", "nimi", "tob", "sob"):
+                return "ins"   # z kimś → su + ins
+            return "gen"       # z czego/kogo → jiz + gen
+        if prev in PREP_CASE:
+            return PREP_CASE[prev][0]
+    
+    # Domyślne reguły zdaniowe
+    if i == 0 or any(x in tokens[:i] for x in ["widzi", "idzie", "jest"]):
+        return "nom"
+    return "acc"
+
+def decline(word, case, number, models):
     best = None
     best_score = float("inf")
-
-    wclass = classify_lemma(word)
-
     for m in models:
-        score = levenshtein(word, m["lemma"])
-        if m["class"] != wclass:
-            score += 2
-
+        score = sum(c1 != c2 for c1,c2 in zip(word, m["lemma"])) + abs(len(word)-len(m["lemma"]))
         if score < best_score:
             best_score = score
             best = m
-
-    return best
-
-# ========================
-# 🧠 POS TAGGING (heurystyka)
-# ========================
-
-def guess_pos(word):
-    if word.endswith(("ć", "ł", "ła", "li")):
-        return "verb"
-    if word in ["w", "do", "z", "na", "o", "k", "ku"]:
-        return "prep"
-    return "noun"
-
-# ========================
-# 🧠 PARSER SKŁADNI
-# ========================
-
-def parse_sentence(tokens):
-    structure = []
-
-    verb_found = False
-
-    for i, word in enumerate(tokens):
-        pos = guess_pos(word)
-
-        if pos == "verb":
-            verb_found = True
-            structure.append((word, "verb"))
-        elif pos == "prep":
-            structure.append((word, "prep"))
-        else:
-            if not verb_found:
-                structure.append((word, "subject"))
-            else:
-                structure.append((word, "object"))
-
-    return structure
-
-# ========================
-# 🧠 PRZYPADKI
-# ========================
-
-PREPOSITIONS = {
-    "w": "loc",
-    "do": "gen",
-    "z": "ins",
-    "na": "loc",
-    "o": "loc",
-    "k": "dat"
-}
-
-def assign_case(role, prev_word):
-    if prev_word in PREPOSITIONS:
-        return PREPOSITIONS[prev_word]
-
-    if role == "subject":
-        return "nom"
-    if role == "object":
-        return "acc"
-
-    return "nom"
-
-# ========================
-# 🔁 ODMIANA
-# ========================
-
-def detect_number(word):
-    if word.endswith(("y", "i", "ów", "ami", "ach")):
-        return "pl"
-    return "sg"
-
-def strip_word(word):
-    for suf in ["ami", "ach", "ów", "a", "y", "i", "ę"]:
-        if word.endswith(suf):
-            return word[:-len(suf)]
-    return word
-
-def decline(word, case, number, models):
-    model = find_model(word, models)
-    if not model:
-        return word
+    if not best: return word
 
     key = f"{number}_{case}"
-    if key not in model["endings"]:
-        return word
-
-    base = strip_word(word)
-    return base + model["endings"][key]
-
-# ========================
-# 🚀 PIPELINE
-# ========================
+    return best["endings"].get(key, word)
 
 def process(sentence):
     models = build_models()
     tokens = sentence.lower().split()
-
-    parsed = parse_sentence(tokens)
-
     result = []
 
-    for i, (word, role) in enumerate(parsed):
-        if role == "prep":
-            result.append("v" if word == "w" else word)
+    for i, word in enumerate(tokens):
+        if word in ("z", "ze"):
+            # Decyzja su / jiz zostanie podjęta przy następnym rzeczowniku
+            continue
+        if word in PREP_CASE:
+            result.append(PREP_CASE[word][1] if word in PREP_CASE else word)
             continue
 
-        prev = tokens[i-1] if i > 0 else ""
-        case = assign_case(role, prev)
-        number = detect_number(word)
+        case = get_case_from_context(tokens, i)
+        number = "pl" if word.endswith(("y","i","ów","ami","ach")) else "sg"
 
         result.append(decline(word, case, number, models))
 
     return " ".join(result)
 
-# ========================
-# TESTY
-# ========================
-
+# Testy
 if __name__ == "__main__":
-    print(process("Kobieta widzi mężczyznę"))
-    print(process("W grodzie"))
-    print(process("Do grodów"))
-    print(process("Programista widzi kobietę"))
-    print(process("Na komputerach"))
+    tests = [
+        "Kobieta widzi mężczyznę",
+        "Idę z przyjacielem",
+        "Zrobiłem to z przyjemnością",
+        "Z okna widzę morze",
+        "W grodzie",
+        "Do grodów",
+        "Na komputerach"
+    ]
+    for t in tests:
+        print(t, "→", process(t))
