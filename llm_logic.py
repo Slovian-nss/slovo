@@ -32,23 +32,17 @@ def build_models():
         case = detect_case(tag)
         num = detect_number(tag)
         key = f"{num}_{case}"
-        
         if lemma not in models:
             models[lemma] = {"endings": {}, "class": "fem" if lemma.endswith("a") else "neut" if lemma[-1] in "oe" else "masc"}
         models[lemma]["endings"][key] = slov
     return models
 
-# ========================
-# REGUŁY PRZYIMKÓW
-# ========================
 PREP_RULES = {
     "w":  ("loc", "v"),
     "do": ("gen", "do"),
     "na": ("loc", "na"),
     "o":  ("loc", "o"),
     "k":  ("dat", "k"),
-    "z":  None,   # specjalna obsługa poniżej
-    "ze": None
 }
 
 def get_case_and_prep(tokens, i):
@@ -58,15 +52,15 @@ def get_case_and_prep(tokens, i):
     if prev in ("z", "ze"):
         # z kimś/czymś → su + ins
         # z kogo/czego → jiz + gen
-        next_word = tokens[i+1] if i+1 < len(tokens) else ""
-        if any(x in next_word for x in ["kim","czym","nim","nią","nimi","sob","tob"]):
-            return "ins", "su"
+        if i+1 < len(tokens):
+            nxt = tokens[i+1].lower()
+            if any(x in nxt for x in ["kim","czym","nim","nią","nimi","sob","tob"]):
+                return "ins", "su"
         return "gen", "jiz"
     
     if prev in PREP_RULES:
-        case, prep = PREP_RULES[prev]
-        return case, prep
-    return "acc", None   # domyślnie dopełnienie
+        return PREP_RULES[prev]
+    return "acc", None
 
 def decline(word, case, number, models):
     if not word: return "●"
@@ -74,7 +68,7 @@ def decline(word, case, number, models):
     best_score = float("inf")
     
     for lemma, m in models.items():
-        score = sum(a != b for a,b in zip(word.lower(), lemma.lower())) + abs(len(word)-len(lemma))
+        score = sum(a != b for a, b in zip(word.lower(), lemma.lower())) + abs(len(word) - len(lemma))
         if score < best_score:
             best_score = score
             best_model = m
@@ -83,27 +77,19 @@ def decline(word, case, number, models):
         return "●"
     
     key = f"{number}_{case}"
-    result = best_model["endings"].get(key)
-    return result if result else "●"
+    return best_model["endings"].get(key, "●")
 
-# ========================
-# GŁÓWNA FUNKCJA
-# ========================
 def process(sentence):
     models = build_models()
     tokens = sentence.lower().split()
     result = []
-    
     i = 0
     while i < len(tokens):
         word = tokens[i]
-        
         if word in ("z", "ze"):
-            # przyimek obsługiwany przy następnym słowie
             i += 1
             continue
-            
-        if word in PREP_RULES and PREP_RULES[word]:
+        if word in PREP_RULES:
             result.append(PREP_RULES[word][1])
             i += 1
             continue
@@ -114,12 +100,13 @@ def process(sentence):
         translated = decline(word, case, number, models)
         result.append(translated)
         i += 1
-    
     return " ".join(result)
 
-# Test
+# ========================
+# TESTY - tylko rzeczywiste
+# ========================
 if __name__ == "__main__":
-    print(process("W ogrodzie"))          # → Vu ogrodzie.
-    print(process("Z przyjacielem"))      # → Su prijateljem.
-    print(process("Z okna"))              # → Jiz okna.
+    print(process("W ogrodzie"))
+    print(process("Z przyjacielem"))
+    print(process("Z okna"))
     print(process("Kobieta widzi mężczyznę"))
