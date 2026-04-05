@@ -1,6 +1,5 @@
 let plToSlo = {}, sloToPl = {};
 let wordTypes = {};
-
 const languageData = [
     { code: 'slo', slo: 'Slověnьsky', pl: 'Słowiański', en: 'Slovian (Slavic)', de: 'Slawisch', cs: 'Slovanský', sk: 'Slovanský', ru: 'Славянский', fr: 'Slave', es: 'Eslavo', it: 'Slavo', uk: 'Слов\'янська', be: 'Славянская', bg: 'Славянски', hr: 'Slavenski', sr: 'Словенски', 'sr-Latn': 'Slavenski', sl: 'Slovanski', mk: 'Словенски', pt: 'Eslavo', nl: 'Slavisch', da: 'Slavisk', sv: 'Slaviska', no: 'Slavisk', fi: 'Slaavilainen', et: 'Slaavi', lv: 'Slāvu', lt: 'Slavų', el: 'Σλαβική', tr: 'Slavca', hu: 'Szláv', ro: 'Slavă', ja: 'スラヴ語', ko: '슬라브어', "zh-CN": '斯拉夫语', "zh-TW": '斯拉夫語', ar: 'السلافية', hi: 'स्लाविक', id: 'Slavia', vi: 'Tiếng Slav', th: 'ภาษาสลาวิก', he: 'סלאבית', az: 'Slavyan', ka: 'სლავური', hy: 'Սլավոնական', af: 'Slawies', sq: 'Sllave', am: 'ስላቪክ', bn: 'স্লাভিক', ms: 'Slavik', zu: 'IsiSlavic' },
     { code: 'en', pl: 'Angielski', en: 'English', slo: "Angol'ьsky", de: 'Englisch' },
@@ -20,7 +19,7 @@ const languageData = [
     { code: 'az', pl: 'Azerbejdżański', en: 'Azerbaijani', slo: "Azerbed'ěnьsky", de: 'Aserbaidschanisch' },
     { code: 'bn', pl: 'Bengalski', en: 'Bengali', slo: 'Bengalьsky', de: 'Bengalisch' },
     { code: 'be', pl: 'Białoruski', en: 'Belarusian', slo: 'Bělorusьsky', de: 'Weißrussisch' },
-    { code: 'bg', pl: 'Bułgarski', en: 'Bulgarian', slo: "Bulgar'ьsky", de: 'Bulgarisch' },
+    { code: 'bg', pl: 'Bułgarski', en: 'Bulgarian', slo: "Boulgar'ьsky", de: 'Bulgarisch' },
     { code: 'ca', pl: 'Kataloński', en: 'Catalan', slo: "Katalonьsky", de: 'Katalanisch' },
     { code: 'zh-CN', pl: 'Chiński (uproszczony)', en: 'Chinese (Simplified)', slo: 'Kitajьsky (Uproščeny)', de: 'Chinesisch (Vereinfacht)' },
     { code: 'zh-TW', pl: 'Chiński (tradycyjny)', en: 'Chinese (Traditional)', slo: 'Kitajьsky (Obyčajьny)', de: 'Chinesisch (Traditionell)' },
@@ -52,7 +51,6 @@ const languageData = [
     { code: 'tr', pl: 'Turecki', en: 'Turkish', slo: 'Turečьsky', de: 'Türkisch' },
     { code: 'vi', pl: 'Wietnamski', en: 'Vietnamese', slo: 'Větnamьsky', de: 'Vietnamesisch' }
 ];
-
 const uiTranslations = {
     slo: { title: "Slovo Perkladačь", from: "Jiz ęzyka:", to: "Na ęzyk:", paste: "Vyloži", clear: "Terbi", copy: "Poveli", placeholder: "Piši tu..." },
     pl: { title: "Slovo Tłumacz", from: "Z języka:", to: "Na język:", paste: "Wklej", clear: "Usuń", copy: "Kopiuj", placeholder: "Wpisz tekst..." },
@@ -85,12 +83,14 @@ const uiTranslations = {
     ko: { title: "Slovo 번역기", from: "출발:", to: "도착:", paste: "붙여넣기", clear: "지우기", copy: "복사", placeholder: "텍스트 입력..." },
     ar: { title: "مترجم Slovo", from: "من:", to: "إلى:", paste: "لصق", clear: "مسح", copy: "نسخ", placeholder: "أدخل النص..." }
 };
-
+// --- POPRAWIONA FUNKCJA GENERUJĄCA LISTĘ JĘZYKÓW ---
 function populateLanguageLists(uiLang, userLocale) {
     const s1 = document.getElementById('srcLang'), s2 = document.getElementById('tgtLang');
     if (!s1 || !s2) return;
     let dn;
-    try { dn = new Intl.DisplayNames([userLocale], { type: 'language' }); } catch (e) {}
+    try {
+        dn = new Intl.DisplayNames([userLocale], { type: 'language' });
+    } catch (e) {}
     [s1, s2].forEach(s => {
         s.options.length = 0;
         languageData.forEach(l => {
@@ -99,7 +99,11 @@ function populateLanguageLists(uiLang, userLocale) {
                 name = l[uiLang] || l.en || l.slo;
             } else {
                 if (dn) {
-                    try { name = dn.of(l.code); } catch (e) { name = l[uiLang] || l.en || l.code; }
+                    try {
+                        name = dn.of(l.code);
+                    } catch (e) {
+                        name = l[uiLang] || l.en || l.code;
+                    }
                 } else {
                     name = l[uiLang] || l.en || l.code;
                 }
@@ -109,14 +113,13 @@ function populateLanguageLists(uiLang, userLocale) {
         });
     });
 }
-
+// --- FUNKCJE WIELKOŚCI LITER ---
 function getCase(word) {
     if (!word) return "lower";
     if (word === word.toUpperCase() && word.length > 1) return "upper";
     if (word[0] === word[0].toUpperCase()) return "title";
     return "lower";
 }
-
 function applyCase(word, caseType) {
     if (!word) return "";
     switch (caseType) {
@@ -125,7 +128,7 @@ function applyCase(word, caseType) {
         default: return word.toLowerCase();
     }
 }
-
+// --- LOGIKA TŁUMACZENIA ---
 function dictReplace(text, dict) {
     if (!text) return "";
     const urlRegex = /(https?:\/\/[^\s]+|[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/g;
@@ -143,7 +146,6 @@ function dictReplace(text, dict) {
     });
     return tempText.replace(/__URL_PH_(\d+)__/g, (match, id) => placeholders[id]);
 }
-
 function reorderSmart(text) {
     if (!text) return "";
     const tokens = text.split(/(\s+|[.,!?;:()=+\-%*/]+)/g).filter(t => t !== "" && t !== undefined);
@@ -198,7 +200,34 @@ function reorderSmart(text) {
     }
     return result.join("");
 }
-
+async function translate() {
+    const input = document.getElementById('userInput');
+    const out = document.getElementById('resultOutput');
+    if (!input || !out) return;
+    const text = input.value;
+    const src = document.getElementById('srcLang').value;
+    const tgt = document.getElementById('tgtLang').value;
+    if (!text.trim()) { out.innerText = ""; return; }
+    try {
+        let finalResult = "";
+        if (src === 'slo' && tgt === 'pl') {
+            finalResult = dictReplace(text, sloToPl);
+        } else if (src === 'pl' && tgt === 'slo') {
+            let translated = dictReplace(text, plToSlo);
+            finalResult = reorderSmart(translated);
+        } else if (src === 'slo') {
+            const bridge = dictReplace(text, sloToPl);
+            finalResult = await google(bridge, 'pl', tgt);
+        } else if (tgt === 'slo') {
+            const bridge = await google(text, src, 'pl');
+            let translated = dictReplace(bridge, plToSlo);
+            finalResult = reorderSmart(translated);
+        } else {
+            finalResult = await google(text, src, tgt);
+        }
+        out.innerText = finalResult;
+    } catch (e) { out.innerText = "Error..."; }
+}
 async function google(text, s, t) {
     try {
         const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${s}&tl=${t}&dt=t&q=${encodeURIComponent(text)}`;
@@ -207,7 +236,6 @@ async function google(text, s, t) {
         return data[0].map(x => x[0]).join('');
     } catch (e) { return text; }
 }
-
 async function loadDictionaries() {
     const status = document.getElementById('dbStatus');
     try {
@@ -257,35 +285,7 @@ function learnFromExamples() {
         .catch(() => {});
 }
 
-async function translate() {
-    const input = document.getElementById('userInput');
-    const out = document.getElementById('resultOutput');
-    if (!input || !out) return;
-    const text = input.value;
-    const src = document.getElementById('srcLang').value;
-    const tgt = document.getElementById('tgtLang').value;
-    if (!text.trim()) { out.innerText = ""; return; }
-    try {
-        let finalResult = "";
-        if (src === 'slo' && tgt === 'pl') {
-            finalResult = dictReplace(text, sloToPl);
-        } else if (src === 'pl' && tgt === 'slo') {
-            let translated = dictReplace(text, plToSlo);
-            finalResult = reorderSmart(translated);
-        } else if (src === 'slo') {
-            const bridge = dictReplace(text, sloToPl);
-            finalResult = await google(bridge, 'pl', tgt);
-        } else if (tgt === 'slo') {
-            const bridge = await google(text, src, 'pl');
-            let translated = dictReplace(bridge, plToSlo);
-            finalResult = reorderSmart(translated);
-        } else {
-            finalResult = await google(text, src, tgt);
-        }
-        out.innerText = finalResult;
-    } catch (e) { out.innerText = "Error..."; }
-}
-
+// --- ZMODYFIKOWANA FUNKCJA INICJUJĄCA ---
 async function init() {
     const sysLocale = navigator.language || 'en';
     const sysLang = sysLocale.split('-')[0];
@@ -311,13 +311,12 @@ async function init() {
         });
     }
     await loadDictionaries();
-    learnFromExamples();  // samouczenie na podstawie example_sentences.json
+    learnFromExamples();   // samouczenie
     const userInput = document.getElementById('userInput');
     if (userInput) {
         userInput.addEventListener('input', debounce(translate, 300));
     }
 }
-
 function applyUI(lang) {
     const ui = uiTranslations[lang] || uiTranslations.en;
     const ids = ['ui-title', 'ui-label-from', 'ui-label-to', 'ui-paste', 'ui-clear', 'ui-copy'];
@@ -328,7 +327,6 @@ function applyUI(lang) {
     const input = document.getElementById('userInput');
     if (input) input.placeholder = ui.placeholder;
 }
-
 function swapLanguages() {
     const src = document.getElementById('srcLang');
     const tgt = document.getElementById('tgtLang');
@@ -337,17 +335,14 @@ function swapLanguages() {
     localStorage.setItem('tgtLang', tgt.value);
     translate();
 }
-
 function clearText() {
     document.getElementById('userInput').value = "";
     document.getElementById('resultOutput').innerText = "";
 }
-
 function copyText() {
     const text = document.getElementById('resultOutput').innerText;
     navigator.clipboard.writeText(text);
 }
-
 async function pasteText() {
     try {
         const text = await navigator.clipboard.readText();
@@ -355,7 +350,6 @@ async function pasteText() {
         translate();
     } catch(e) { console.log("Clipboard error"); }
 }
-
 function debounce(func, wait) {
     let timeout;
     return function() {
@@ -363,5 +357,4 @@ function debounce(func, wait) {
         timeout = setTimeout(() => func.apply(this, arguments), wait);
     };
 }
-
 window.onload = init;
