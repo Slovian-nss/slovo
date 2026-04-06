@@ -1,80 +1,98 @@
 import json
-from typing import Dict, Tuple, Optional
+from typing import Optional
 
 class SlovianDecliner:
     def __init__(self):
         with open('vuzor.json', encoding='utf-8') as f:
             self.vuzor = json.load(f)
         
-        self.lookup: Dict[Tuple[str, str], str] = {}
-        for entry in self.vuzor:
-            polish = entry['polish'].lower()
-            case_str = entry['type and case']
-            self.lookup[(polish, case_str)] = entry['slovian']
+        self.lookup = {}
+        for e in self.vuzor:
+            key = (e['polish'].lower(), e['type and case'])
+            self.lookup[key] = e['slovian']
 
-    # === GŁÓWNA METODA: automatyczne odmienianie przez przypadek ===
-    def decline(self, polish_word: str, case_name: str, number: str = "singular", 
-                word_type: str = "noun", gender: str = None, context: str = None) -> Optional[str]:
+    def decline(self, polish: str, case_name: str, number: str = "singular", 
+                word_type: str = "noun", gender: str = None) -> str:
         
-        polish_lower = polish_word.lower()
-        
-        # 1. Najpierw próbujemy dokładny wpis z kontekstem
-        if context:
-            for e in self.vuzor:
-                if (e['polish'].lower() == polish_lower and 
-                    e.get('context', '').lower() == context.lower()):
-                    base_case = e['type and case']
-                    # Budujemy klucz przypadku
-                    full_case = base_case.replace("poedinьna ličьba", 
-                        "munoga ličьba" if number == "plural" else "poedinьna ličьba")
-                    full_case = full_case.replace("jimenovьnik", case_name)  # zamiana na żądany przypadek
-                    result = self.lookup.get((polish_lower, full_case))
-                    if result:
-                        return result
+        p = polish.lower()
+        num = "munoga ličьba" if number == "plural" else "poedinьna ličьba"
 
-        # 2. Standardowe budowanie klucza przypadku
-        num_str = "munoga ličьba" if number == "plural" else "poedinьna ličьba"
-        
+        # 1. Dokładna forma z JSON
         if word_type == "noun":
-            prefix = f"noun - jimenьnik: \"{polish_word}\" | "
-            if gender is None:
-                # Automatyczne zgadywanie na podstawie znanych wzorów
-                if polish_word.lower().endswith('a'):
-                    gender_part = "type feminine (inanimate) - rod'ajь ženьsky (neživotьny)"
-                else:
-                    gender_part = "type masculine (inanimate) - rod'ajь mǫžьsky (neživotьny)"
-            else:
-                gender_part = f"type {gender} - rod'ajь"
-            
-            case_key = f"{prefix}{case_name} | {num_str} | {gender_part}"
-            
+            g = gender or ("feminine (inanimate)" if p.endswith('a') else "masculine (inanimate)")
+            key = f"noun - jimenьnik: \"{polish}\" | {case_name} | {num} | type {g}"
+            if (p, key) in self.lookup:
+                return self.lookup[(p, key)]
+
         elif word_type == "adjective":
-            prefix = f"adjective - pridavьnik: \"{polish_word}\" | "
             g = gender or "masculine"
-            gender_part = f"type {g} - rod'ajь mǫžьsky" if g == "masculine" else \
-                          f"type {g} - rod'ajь ženьsky" if g == "feminine" else \
-                          f"type {g} - rod'ajь nijaky"
-            case_key = f"{prefix}{case_name} | {num_str} | {gender_part}"
-        
-        else:
-            return None
+            gs = "mǫžьsky" if g == "masculine" else "ženьsky" if g == "feminine" else "nijaky"
+            key = f"adjective - pridavьnik: \"{polish}\" | {case_name} | {num} | type {g} - rod'ajь {gs}"
+            if (p, key) in self.lookup:
+                return self.lookup[(p, key)]
 
-        # Szukanie dokładnego dopasowania
-        result = self.lookup.get((polish_lower, case_key))
-        if result:
-            return result
+        # 2. Fallback z JSON (podobny przypadek)
+        for (w, c), s in self.lookup.items():
+            if w == p and case_name in c and num in c:
+                return s
 
-        # Fallback: szukanie podobnego przypadku (np. tylko zmiana liczby lub przypadku)
-        for key, val in self.lookup.items():
-            if key[0] == polish_lower and case_name in key[1] and num_str in key[1]:
-                return val
+        # 3. Pełne reguły fallback dla wszystkich typów
 
-        return None  # Nie znaleziono formy
+        if word_type == "noun":
+            if number == "singular":
+                if case_name == "městьnik":      # locative
+                    if p.endswith('a'): return p[:-1] + "ě"
+                    else: return p + "ě"
+                elif case_name == "orǫdьnik":    # instrumental
+                    if p.endswith('a'): return p[:-1] + "ojǫ"
+                    else: return p + "omь"
+                elif case_name == "vinьnik":     # accusative (nieożywione = nom)
+                    return polish
+                elif case_name == "rodilьnik":   # genitive
+                    if p.endswith('a'): return p[:-1] + "y"
+                    else: return p + "a"
+                elif case_name == "měrьnik":     # dative
+                    if p.endswith('a'): return p[:-1] + "ě"
+                    else: return p + "u"
+                elif case_name == "zovanьnik":   # vocative
+                    if p.endswith('a'): return p[:-1] + "o"
+                    else: return p + "e"
+                elif case_name == "jimenovьnik":
+                    return polish
 
-# ===================== PRZYKŁAD UŻYCIA =====================
+            else:  # plural
+                if case_name in ("jimenovьnik", "vinьnik", "zovanьnik"):
+                    if p.endswith('a'): return p[:-1] + "i"
+                    else: return p + "i"
+                elif case_name == "rodilьnik":
+                    return p + "ov" if not p.endswith('a') else p[:-1]
+                elif case_name == "městьnik":
+                    return p + "ah"
+                elif case_name == "měrьnik":
+                    return p + "am"
+                elif case_name == "orǫdьnik":
+                    return p + "ami"
+
+        elif word_type == "adjective":
+            base = polish
+            if number == "singular":
+                if gender == "feminine":
+                    if case_name == "vinьnik": return base + "ǫ"
+                    if case_name in ("městьnik", "měrьnik", "rodilьnik"): return base + "eji"
+                    if case_name == "orǫdьnik": return base + "ejǫ"
+                    return base + "a"
+                else:  # masculine/neuter
+                    if case_name == "rodilьnik": return base + "ogo"
+                    if case_name == "měrьnik": return base + "omu"
+                    if case_name in ("městьnik", "orǫdьnik"): return base + "ymь"
+                    return base + "y" if case_name == "vinьnik" else base
+            else:  # plural
+                if case_name in ("rodilьnik", "městьnik"): return base + "yh"
+                if case_name == "měrьnik": return base + "ymь"
+                if case_name == "orǫdьnik": return base + "ymi"
+                return base + "e" if gender == "feminine" else base + "i"
+
+        return f"[{polish} - brak formy]"
+
+# ===================== UŻYCIE =====================
 decliner = SlovianDecliner()
-
-# Testy
-print(decliner.decline("ogród", "městьnik", "singular", "noun", context="garden"))   # → vu ogrodě / vu obgordě
-print(decliner.decline("obietnica", "vinьnik", "singular"))                       # → obětьnicǫ
-print(decliner.decline("równy", "vinьnik", "singular", "adjective", "feminine")) # → orvьnǫ
