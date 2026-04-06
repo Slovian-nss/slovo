@@ -3,7 +3,7 @@ let plToSlo = {}, sloToPl = {};
 let wordTypes = {};
 
 const languageData = [
-    { code: 'slo', slo: 'Slověnьsky', pl: 'Prasłowiański', en: 'Slovian (Proto-Slavic)', de: 'Urslawisch' },
+    { code: 'slo', slo: 'Slověnьsky', pl: 'Słowiański', en: 'Slovian (Slavic)', de: 'Slawisch' },
     { code: 'pl', pl: 'Polski', en: 'Polish', slo: "Pol'ьsky", de: 'Polnisch' },
     { code: 'en', pl: 'Angielski', en: 'English', slo: "Angol'ьsky", de: 'Englisch' },
     { code: 'de', pl: 'Niemiecki', en: 'German', slo: 'Nemьčьsky', de: 'Deutsch' },
@@ -68,7 +68,6 @@ function populateLanguageLists(uiLang, userLocale) {
                     name = dn ? dn.of(l.code) : (l[uiLang] || l.en);
                 } catch (e) { name = l[uiLang] || l.en; }
             }
-            // Specyficzna poprawka dla serbskiego w liście wyboru
             if (l.code === 'sr') name = (uiLang === 'pl') ? "Serbski (cyrylica)" : "Serbian (Cyrillic)";
             if (l.code === 'sr-Latn') name = (uiLang === 'pl') ? "Serbski (łacina)" : "Serbian (Latin)";
 
@@ -96,7 +95,7 @@ function applyUI(lang) {
     if (input) input.placeholder = ui.placeholder;
 }
 
-// --- FUNKCJE WIELKOŚCI LITER (CASE MAPPING) ---
+// --- FUNKCJE WIELKOŚCI LITER ---
 function getCase(word) {
     if (!word) return "lower";
     if (word === word.toUpperCase() && word.length > 1) return "upper";
@@ -121,7 +120,6 @@ function dictReplace(text, dict) {
         return `__URL_PH_${placeholders.length - 1}__`;
     });
 
-    // Rozpoznawanie słów uwzględniające znaki prasłowiańskie
     tempText = tempText.replace(/[a-ząćęłńóśźżěьъǫę']+/gi, (word) => {
         const lowWord = word.toLowerCase();
         if (dict[lowWord]) {
@@ -182,7 +180,7 @@ function reorderSmart(text) {
     return result.join("");
 }
 
-// --- KOMUNIKACJA Z API (Z BRIDGE TRANSLATION) ---
+// --- KOMUNIKACJA Z API (Z PEŁNYM PIPELINE) ---
 async function google(text, s, t) {
     try {
         const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${s}&tl=${t}&dt=t&q=${encodeURIComponent(text)}`;
@@ -206,18 +204,19 @@ async function translate() {
     try {
         let finalResult = "";
 
-        // SCENARIUSZ: Słowiański -> Inny (przez Polski)
-        if (src === 'slo') {
-            const bridge = dictReplace(text, sloToPl);
-            finalResult = (tgt === 'pl') ? bridge : await google(bridge, 'pl', tgt);
-        } 
-        // SCENARIUSZ: Inny -> Słowiański (przez Polski)
-        else if (tgt === 'slo') {
+        // SCENARIUSZ: Inny -> Słowiański (Pipeline: Inny -> Google PL -> Słowiański)
+        if (tgt === 'slo') {
+            // Zawsze puszczamy przez Google PL, nawet jeśli src === 'pl' dla normalizacji
             const bridge = await google(text, src, 'pl');
             let translated = dictReplace(bridge, plToSlo);
             finalResult = reorderSmart(translated);
         } 
-        // SCENARIUSZ: Standardowe tłumaczenie między językami Google
+        // SCENARIUSZ: Słowiański -> Inny (Pipeline: Słowiański -> Polski -> Google Inny)
+        else if (src === 'slo') {
+            const bridge = dictReplace(text, sloToPl);
+            finalResult = (tgt === 'pl') ? bridge : await google(bridge, 'pl', tgt);
+        } 
+        // SCENARIUSZ: Standardowe Google
         else {
             finalResult = await google(text, src, tgt);
         }
@@ -292,7 +291,6 @@ function swapLanguages() {
     const input = document.getElementById('userInput');
     const output = document.getElementById('resultOutput');
 
-    // Zamiana języków
     const tempLang = srcSelect.value;
     srcSelect.value = tgtSelect.value;
     tgtSelect.value = tempLang;
@@ -300,7 +298,6 @@ function swapLanguages() {
     localStorage.setItem('srcLang', srcSelect.value);
     localStorage.setItem('tgtLang', tgtSelect.value);
 
-    // Przerzucenie tekstu (odwrócenie tłumaczenia)
     if (output.innerText.trim() !== "") {
         input.value = output.innerText;
     }
