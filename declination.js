@@ -1,159 +1,55 @@
-// declination.js
+import json
+from typing import Dict, Tuple, Optional
 
-let plToSlo = {}, sloToPl = {};
-let wordTypes = {};
+class SlovianDecliner:
+    def __init__(self):
+        with open('vuzor.json', encoding='utf-8') as f:
+            self.vuzor = json.load(f)
+        self.lookup: Dict[Tuple[str, str], str] = {}
+        self.context_index: Dict[Tuple[str, str], dict] = {}
+        for e in self.vuzor:
+            polish_lower = e['polish'].lower()
+            key = (polish_lower, e['type and case'])
+            self.lookup[key] = e['slovian']
+            if 'context' in e and e['context']:
+                ctx_key = (polish_lower, e['context'].lower())
+                self.context_index[ctx_key] = e
 
-// --- Wczytywanie słowników ---
-async function loadDictionaries() {
-    try {
-        const files = ['osnova.json', 'vuzor.json'];
-        for (const file of files) {
-            const res = await fetch(file);
-            if (!res.ok) continue;
-            const data = await res.json();
-            data.forEach(item => {
-                if (item.polish && item.slovian) {
-                    const pl = item.polish.toLowerCase().trim();
-                    const slo = item.slovian.toLowerCase().trim();
-                    plToSlo[pl] = item.slovian.trim();
-                    sloToPl[slo] = item.polish.trim();
+    def translate_decl(self, polish_word: str, case_info: str) -> Optional[str]:
+        """Pełna deklinacja: podaj dokładny 'type and case' z JSON"""
+        key = (polish_word.lower(), case_info)
+        return self.lookup.get(key)
 
-                    if (item["type and case"]) {
-                        const info = item["type and case"].toLowerCase();
-                        if (info.includes("jimenьnik") || info.includes("noun")) wordTypes[slo] = "noun";
-                        if (info.includes("priloga") || info.includes("adjective")) wordTypes[slo] = "adjective";
-                        if (info.includes("ličьnik") || info.includes("numeral")) wordTypes[slo] = "numeral";
-                    }
-                }
-            });
-        }
-        console.log("Dictionaries loaded");
-    } catch (e) {
-        console.error("Error loading dictionaries:", e);
-    }
-}
+    def get_by_context(self, polish_word: str, context: str) -> Optional[dict]:
+        """Znajduje lemma + wszystkie formy po kontekście (rzeczownik/przymiotnik)"""
+        ctx_key = (polish_word.lower(), context.lower())
+        return self.context_index.get(ctx_key)
 
-// --- Funkcje pomocnicze dla wielkości liter ---
-function getCase(word) {
-    if (!word) return "lower";
-    if (word === word.toUpperCase() && word.length > 1) return "upper";
-    if (word[0] === word[0].toUpperCase()) return "title";
-    return "lower";
-}
+    def get_noun_form(self, polish_word: str, case_name: str, number: str = "singular", context: Optional[str] = None) -> Optional[str]:
+        """Deklinacja rzeczownika (męski/żeński/nijaki) z kontekstem"""
+        if context:
+            entry = self.get_by_context(polish_word, context)
+            if not entry or 'noun' not in entry['type and case']:
+                return None
+            base_case = entry['type and case']
+        else:
+            base_case = None
+        full_case = f"noun - jimenьnik: \"{polish_word}\" | {case_name} | {number} - poedinьna ličьba" if number == "singular" else f"noun - jimenьnik: \"{polish_word}\" | {case_name} | munoga ličьba"
+        return self.translate_decl(polish_word, full_case) or self.translate_decl(polish_word, base_case) if base_case else None
 
-function applyCase(word, caseType) {
-    if (!word) return "";
-    switch (caseType) {
-        case "upper": return word.toUpperCase();
-        case "title": return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
-        default: return word.toLowerCase();
-    }
-}
+    def get_adj_form(self, polish_word: str, case_name: str, number: str = "singular", gender: str = "masculine", context: Optional[str] = None) -> Optional[str]:
+        """Deklinacja przymiotnika (męski/żeński/nijaki) z kontekstem"""
+        if context:
+            entry = self.get_by_context(polish_word, context)
+            if not entry or 'pridavьnik' not in entry['type and case']:
+                return None
+        full_case = f"adjective - pridavьnik: \"{polish_word}\" | {case_name} | {number} - poedinьna ličьba | type {gender} - rod'ajь"
+        if gender == "masculine":
+            full_case += " mǫžьsky"
+        elif gender == "feminine":
+            full_case += " ženьsky"
+        else:
+            full_case += " nijaky"
+        return self.translate_decl(polish_word, full_case)
 
-// --- Podstawowe tłumaczenie ze słownika ---
-function dictReplace(text, dict) {
-    if (!text) return "";
-    return text.replace(/[a-ząćęłńóśźżěьъ']+/gi, (word) => {
-        const lowWord = word.toLowerCase();
-        if (dict[lowWord]) {
-            return applyCase(dict[lowWord], getCase(word));
-        }
-        return `__MISSING__${word}__`;
-    });
-}
-
-// --- Reorder dla grup (numeral + adjective + noun) ---
-function reorderSmart(text) {
-    if (!text) return "";
-    const tokens = text.split(/(\s+|[.,!?;:()=+\-%*/]+)/g).filter(t => t !== "" && t !== undefined);
-    const result = [];
-
-    for (let i = 0; i < tokens.length; i++) {
-        let token = tokens[i];
-        let lowToken = token.toLowerCase();
-
-        if (/^[\s.,!?;:()=+\-%*/]+$/.test(token)) {
-            result.push(token);
-            continue;
-        }
-
-        if (wordTypes[lowToken]) {
-            let group = [];
-            let currentIdx = i;
-            let firstWordCase = getCase(tokens[i]);
-
-            while (currentIdx < tokens.length) {
-                let currentToken = tokens[currentIdx];
-                let currentLow = currentToken.toLowerCase();
-
-                if (/^[\s]+$/.test(currentToken)) {
-                    currentIdx++;
-                    continue;
-                }
-
-                let type = wordTypes[currentLow];
-                if (type === "noun" || type === "adjective" || type === "numeral") {
-                    group.push({ val: currentToken, type: type });
-                    i = currentIdx;
-                    currentIdx++;
-                } else {
-                    break;
-                }
-            }
-
-            if (group.length > 1) {
-                const order = { "numeral": 1, "adjective": 2, "noun": 3 };
-                group.sort((a, b) => (order[a.type] || 99) - (order[b.type] || 99));
-
-                group.forEach((word, index) => {
-                    let formattedWord = word.val.toLowerCase();
-                    if (index === 0) formattedWord = applyCase(word.val, firstWordCase);
-                    else if (firstWordCase === "upper") formattedWord = word.val.toUpperCase();
-                    result.push(formattedWord);
-                    if (index < group.length - 1) result.push(" ");
-                });
-                continue;
-            } else if (group.length === 1) {
-                result.push(token);
-                continue;
-            }
-        }
-
-        result.push(token);
-    }
-    return result.join("");
-}
-
-// --- Hybrydowa funkcja tłumaczenia z Ollamą ---
-async function translateWithDeclination(text, src = 'pl', tgt = 'slo') {
-    if (!text) return "";
-
-    // 1. Próba tłumaczenia słownikowego
-    let translated = dictReplace(text, src === 'pl' ? plToSlo : sloToPl);
-
-    // 2. Jeśli występują brakujące słowa, wywołujemy Ollama lokalnie
-    if (translated.includes("__MISSING__")) {
-        try {
-            const res = await fetch("http://localhost:11434/api/generate", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    model: "qwen",
-                    prompt: `Translate to Slovian preserving grammatical cases and order: ${text}`
-                })
-            });
-            const data = await res.json();
-            translated = data.response || translated;
-        } catch (e) {
-            console.warn("Ollama API failed, returning partial translation:", e);
-        }
-    }
-
-    // 3. Popraw szyk słów dla grup: numeral + adjective + noun
-    translated = reorderSmart(translated);
-
-    return translated;
-}
-
-// --- Eksport funkcji ---
-export { loadDictionaries, translateWithDeclination };
+decliner = SlovianDecliner()
