@@ -1,5 +1,5 @@
 /* slovo_ml_bridge.js
- * Bezpieczna warstwa ML do starego script.js.
+ * Warstwa ML + odmiana + interpunkcja do starego script.js.
  *
  * Ładuj w index.html dokładnie w tej kolejności:
  * <script src="slovo_model.js"></script>
@@ -12,35 +12,112 @@
     let slovoMLBridgeModel = null;
     let slovoMLBridgeLoading = null;
 
-    /*
-     * WAŻNE:
-     * false = tryb bezpieczny: nie zgaduje pojedynczych nieznanych słów.
-     * true  = tryb eksperymentalny: model może zgadywać słowa spoza bazy.
-     *
-     * Przy twoim tłumaczu polecam zostawić false,
-     * bo inaczej model może gubić ь, ъ, ę, ǫ itd.
-     */
+    const BRIDGE = {
+        loaded: false,
+        loading: null,
+        pl2slo: new Map(),
+        slo2pl: new Map(),
+        sentPl2Slo: new Map(),
+        sentSlo2Pl: new Map(),
+        stats: {
+            entries: 0,
+            sentences: 0
+        }
+    };
+
     const USE_GUESS_FALLBACK = false;
-
-    /*
-     * false = pojedyncze słowa bierze tylko z osnova/vuzor.
-     * true  = pojedyncze słowa może brać też z modelu ML.
-     *
-     * Zostaw false, jeśli chcesz, aby końcówki były zgodne z plikami.
-     */
     const TRUST_MODEL_SINGLE_WORD = false;
+    const USE_REORDER_SMART = false;
 
-    const MAX_PHRASE_WORDS = 8;
+    const MAX_PHRASE_WORDS = 10;
+
+    const DATA_FILES = [
+        { url: "vuzor.json", source: "vuzor", priority: 400 },
+        { url: "osnova.json", source: "osnova", priority: 300 }
+    ];
+
+    const EXAMPLE_SENTENCE_FILES = [
+        { url: "example_sentences.json", source: "example_sentences", priority: 1000 }
+    ];
+
     const TOKEN_RE = /([\p{L}\p{M}0-9'’.-]+|\s+|[^\s\p{L}\p{M}0-9'’.-]+)/gu;
     const WORD_RE = /^[\p{L}\p{M}0-9'’.-]+$/u;
     const URL_RE = /(https?:\/\/[^\s]+|[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/g;
+    const TERMINAL_PUNCT_RE = /([.!?…]+)$/u;
+
+    const CASE_BY_PREPOSITION = {
+        "do": "genitive",
+        "od": "genitive",
+        "bez": "genitive",
+        "dla": "genitive",
+        "u": "genitive",
+        "około": "genitive",
+        "wokół": "genitive",
+        "podczas": "genitive",
+        "według": "genitive",
+        "oprócz": "genitive",
+
+        "ku": "dative",
+        "dzięki": "dative",
+        "wbrew": "dative",
+        "przeciw": "dative",
+        "przeciwko": "dative",
+
+        "o": "locative",
+        "w": "locative",
+        "we": "locative",
+        "na": "locative",
+        "po": "locative",
+        "przy": "locative",
+
+        "z": "instrumental",
+        "ze": "instrumental",
+        "nad": "instrumental",
+        "pod": "instrumental",
+        "przed": "instrumental",
+        "między": "instrumental",
+        "pomiędzy": "instrumental",
+        "za": "instrumental"
+    };
+
+    const ACCUSATIVE_VERBS = new Set([
+        "mam", "masz", "ma", "mamy", "macie", "mają",
+        "widzę", "widzisz", "widzi", "widzimy", "widzicie", "widzą",
+        "znam", "znasz", "zna", "znamy", "znacie", "znają",
+        "lubię", "lubisz", "lubi", "lubimy", "lubicie", "lubią",
+        "kocham", "kochasz", "kocha", "kochamy", "kochacie", "kochają",
+        "biorę", "bierzesz", "bierze", "bierzemy", "bierzecie", "biorą",
+        "weź", "weźcie", "bierz", "bierzcie",
+        "daj", "daje", "daję", "dajesz", "dajemy", "dają",
+        "kupuję", "kupujesz", "kupuje", "kupujemy", "kupują",
+        "robię", "robisz", "robi", "robimy", "robią",
+        "piszę", "piszesz", "pisze", "piszemy", "piszą",
+        "czytam", "czytasz", "czyta", "czytamy", "czytają",
+        "buduję", "budujesz", "buduje", "budują"
+    ]);
 
     function normalizeKey(text) {
         return String(text ?? "")
             .normalize("NFC")
+            .replace(/[’]/g, "'")
             .replace(/\s+/g, " ")
             .trim()
             .toLocaleLowerCase("pl");
+    }
+
+    function stripTerminalPunct(text) {
+        return String(text ?? "").trim().replace(TERMINAL_PUNCT_RE, "").trim();
+    }
+
+    function getTerminalPunct(text) {
+        const m = String(text ?? "").trim().match(TERMINAL_PUNCT_RE);
+        return m ? m[1] : "";
+    }
+
+    function normalizeSentenceKey(text) {
+        return normalizeKey(stripTerminalPunct(text))
+            .replace(/\s+([,.;:!?])/g, "$1")
+            .replace(/\s+/g, " ");
     }
 
     function isWord(token) {
@@ -121,48 +198,373 @@
         };
     }
 
-    function getLocalDict(direction) {
-        try {
-            if (direction === "slo2pl" && typeof sloToPl !== "undefined") return sloToPl || {};
-            if (direction === "pl2slo" && typeof plToSlo !== "undefined") return plToSlo || {};
-        } catch (e) {}
-        return {};
+    function parseMeta(typeCase) {
+        const info = normalizeKey(typeCase || "");
+        const meta = {
+            raw: String(typeCase || ""),
+            wordClass: "unknown",
+            grammaticalCase: null,
+            number: null,
+            isPhrase: false
+        };
+
+        if (info.includes("phrase") || info.includes("rěčen")) meta.isPhrase = true;
+        if (info.includes("noun") || info.includes("jimenьnik")) meta.wordClass = "noun";
+        if (info.includes("adjective") || info.includes("priloga")) meta.wordClass = "adjective";
+        if (info.includes("numeral") || info.includes("ličьnik")) meta.wordClass = "numeral";
+        if (info.includes("verb") || info.includes("glagol")) meta.wordClass = "verb";
+        if (meta.isPhrase) meta.wordClass = "phrase";
+
+        if (info.includes("nominative") || info.includes("jimenovьnik")) meta.grammaticalCase = "nominative";
+        else if (info.includes("accusative") || info.includes("vinьnik")) meta.grammaticalCase = "accusative";
+        else if (info.includes("genitive") || info.includes("rodilьnik")) meta.grammaticalCase = "genitive";
+        else if (info.includes("locative") || info.includes("městьnik")) meta.grammaticalCase = "locative";
+        else if (info.includes("dative") || info.includes("měrьnik")) meta.grammaticalCase = "dative";
+        else if (info.includes("instrumental") || info.includes("orǫdьnik")) meta.grammaticalCase = "instrumental";
+        else if (info.includes("vocative") || info.includes("zovanьnik")) meta.grammaticalCase = "vocative";
+
+        if (info.includes("singular") || info.includes("poedinьna")) meta.number = "singular";
+        else if (info.includes("plural") || info.includes("munoga")) meta.number = "plural";
+
+        return meta;
     }
 
-    function localLookup(text, direction) {
-        const dict = getLocalDict(direction);
-        const key = normalizeKey(text);
+    function compareCandidateStatic(a, b) {
+        const pa = a.priority || 0;
+        const pb = b.priority || 0;
+        if (pb !== pa) return pb - pa;
 
-        if (!key) return null;
+        const aw = wordCount(a.source);
+        const bw = wordCount(b.source);
+        if (bw !== aw) return bw - aw;
 
-        if (Object.prototype.hasOwnProperty.call(dict, key)) {
-            return dict[key];
+        const an = a.meta && a.meta.grammaticalCase === "nominative" ? 1 : 0;
+        const bn = b.meta && b.meta.grammaticalCase === "nominative" ? 1 : 0;
+        if (bn !== an) return bn - an;
+
+        const as = a.meta && a.meta.number === "singular" ? 1 : 0;
+        const bs = b.meta && b.meta.number === "singular" ? 1 : 0;
+        return bs - as;
+    }
+
+    function addToMap(map, source, target, data) {
+        const src = String(source ?? "").trim();
+        const tgt = String(target ?? "").trim();
+        if (!src || !tgt) return;
+
+        const key = normalizeKey(src);
+        const list = map.get(key) || [];
+        const meta = parseMeta(data.typeCase);
+
+        list.push({
+            source: src,
+            target: tgt,
+            context: data.context || "",
+            typeCase: data.typeCase || "",
+            sourceFile: data.source || "unknown",
+            priority: data.priority || 0,
+            meta
+        });
+
+        list.sort(compareCandidateStatic);
+        map.set(key, list);
+        BRIDGE.stats.entries++;
+    }
+
+    function addSentencePair(polish, slovian, data) {
+        const pl = String(polish ?? "").trim();
+        const slo = String(slovian ?? "").trim();
+        if (!pl || !slo) return;
+
+        const plKey = normalizeSentenceKey(pl);
+        const sloKey = normalizeSentenceKey(slo);
+
+        BRIDGE.sentPl2Slo.set(plKey, {
+            source: pl,
+            target: slo,
+            priority: data.priority || 1000,
+            sourceFile: data.source || "example_sentences"
+        });
+
+        BRIDGE.sentSlo2Pl.set(sloKey, {
+            source: slo,
+            target: pl,
+            priority: data.priority || 1000,
+            sourceFile: data.source || "example_sentences"
+        });
+
+        BRIDGE.stats.sentences++;
+    }
+
+    function getPreviousWord(tokens, index, step) {
+        let found = 0;
+
+        for (let i = index - 1; i >= 0; i--) {
+            if (isWord(tokens[i])) {
+                found++;
+                if (found === step) return normalizeKey(tokens[i]);
+            } else if (!isSpace(tokens[i])) {
+                if (found === 0) continue;
+                break;
+            }
         }
 
+        return "";
+    }
+
+    function inferPolishCaseFromEnding(word) {
+        const w = normalizeKey(word);
+        if (!w) return null;
+
+        if (/(ami|emi|mi)$/.test(w)) return "instrumental";
+        if (/(ach|ech)$/.test(w)) return "locative";
+        if (/(om)$/.test(w)) return "dative";
+        if (/(ą)$/.test(w)) return "instrumental";
+        if (/(ę)$/.test(w)) return "accusative";
+
         return null;
     }
 
-    function modelLookup(text, direction, allowSingleWord) {
-        if (!slovoMLBridgeModel) return null;
+    function inferWantedCase(tokens, startIndex, sourceText, direction) {
+        if (direction === "slo2pl") return null;
 
-        const wc = wordCount(text);
-        if (wc <= 1 && !allowSingleWord) return null;
+        const src = normalizeKey(sourceText);
+        const byEnding = inferPolishCaseFromEnding(src);
 
+        const prev1 = getPreviousWord(tokens, startIndex, 1);
+        const prev2 = getPreviousWord(tokens, startIndex, 2);
+
+        if (prev1 && CASE_BY_PREPOSITION[prev1]) {
+            if ((prev1 === "z" || prev1 === "ze") && byEnding === "genitive") return "genitive";
+            return CASE_BY_PREPOSITION[prev1];
+        }
+
+        if (prev2 && prev1 && normalizeKey(prev2 + " " + prev1) === "z powodu") {
+            return "genitive";
+        }
+
+        if (prev1 && ACCUSATIVE_VERBS.has(prev1)) return "accusative";
+
+        if (byEnding) return byEnding;
+
+        return "nominative";
+    }
+
+    function candidateScore(candidate, sourceText, tokens, startIndex, direction) {
+        let score = candidate.priority || 0;
+        const wc = wordCount(candidate.source);
+        score += wc * 40;
+
+        if (candidate.meta && candidate.meta.isPhrase) score += 80;
+
+        const wantedCase = inferWantedCase(tokens, startIndex, sourceText, direction);
+        const cCase = candidate.meta && candidate.meta.grammaticalCase;
+
+        if (wantedCase && cCase) {
+            if (wantedCase === cCase) score += 90;
+            else score -= 40;
+        }
+
+        if (!wantedCase && cCase === "nominative") score += 20;
+
+        if (
+            wc === 1 &&
+            cCase === "nominative" &&
+            candidate.meta &&
+            candidate.meta.number === "singular"
+        ) {
+            score += 25;
+        }
+
+        if (/[ьъ]$/.test(candidate.target)) score += 3;
+
+        return score;
+    }
+
+    function chooseCandidate(candidates, sourceText, tokens, startIndex, direction) {
+        if (!candidates || !candidates.length) return null;
+
+        let best = null;
+        let bestScore = -Infinity;
+
+        for (const cand of candidates) {
+            const score = candidateScore(cand, sourceText, tokens || [], startIndex || 0, direction);
+            if (score > bestScore) {
+                best = cand;
+                bestScore = score;
+            }
+        }
+
+        return best;
+    }
+
+    async function fetchJsonMaybe(url) {
         try {
-            const modelDirection = direction === "slo2pl" ? "slo2pl" : "pl2slo";
-            const exact = slovoMLBridgeModel.lookup(text, modelDirection);
-            if (exact && exact.target) return exact.target;
-        } catch (e) {}
-
-        return null;
+            const res = await fetch(url, { cache: "no-store" });
+            if (!res.ok) return null;
+            return await res.json();
+        } catch (e) {
+            console.warn("Nie można pobrać:", url, e);
+            return null;
+        }
     }
 
-    function findBestLocalPhrase(tokens, startIndex, direction) {
-        const dict = getLocalDict(direction);
+    function absorbRows(rows, fileInfo) {
+        if (!Array.isArray(rows)) return;
 
+        for (const item of rows) {
+            if (!item || typeof item !== "object") continue;
+
+            const polish = item.polish;
+            const slovian = item.slovian;
+
+            if (polish && slovian) {
+                const data = {
+                    typeCase: item["type and case"] || item.type || "",
+                    context: item.context || "",
+                    source: fileInfo.source,
+                    priority: fileInfo.priority
+                };
+
+                addToMap(BRIDGE.pl2slo, polish, slovian, data);
+                addToMap(BRIDGE.slo2pl, slovian, polish, data);
+
+                if (
+                    data.typeCase &&
+                    (
+                        String(data.typeCase).includes("phrase") ||
+                        String(data.typeCase).includes("rěčen")
+                    )
+                ) {
+                    addSentencePair(polish, slovian, {
+                        source: fileInfo.source,
+                        priority: fileInfo.priority + 100
+                    });
+                }
+            }
+        }
+    }
+
+    async function loadBridgeData() {
+        if (BRIDGE.loaded) return true;
+        if (BRIDGE.loading) return BRIDGE.loading;
+
+        BRIDGE.loading = (async function () {
+            for (const fileInfo of EXAMPLE_SENTENCE_FILES) {
+                const rows = await fetchJsonMaybe(fileInfo.url);
+                if (Array.isArray(rows)) {
+                    for (const row of rows) {
+                        if (row && row.polish && row.slovian) {
+                            addSentencePair(row.polish, row.slovian, fileInfo);
+                        }
+                    }
+                }
+            }
+
+            for (const fileInfo of DATA_FILES) {
+                const rows = await fetchJsonMaybe(fileInfo.url);
+                absorbRows(rows, fileInfo);
+            }
+
+            try {
+                if (typeof plToSlo !== "undefined") {
+                    Object.keys(plToSlo || {}).forEach(function (pl) {
+                        addToMap(BRIDGE.pl2slo, pl, plToSlo[pl], {
+                            typeCase: "",
+                            context: "",
+                            source: "script.js/plToSlo",
+                            priority: 100
+                        });
+                    });
+                }
+
+                if (typeof sloToPl !== "undefined") {
+                    Object.keys(sloToPl || {}).forEach(function (slo) {
+                        addToMap(BRIDGE.slo2pl, slo, sloToPl[slo], {
+                            typeCase: "",
+                            context: "",
+                            source: "script.js/sloToPl",
+                            priority: 100
+                        });
+                    });
+                }
+            } catch (e) {}
+
+            BRIDGE.loaded = true;
+            console.log("Slovo bridge data loaded:", BRIDGE.stats);
+            return true;
+        })();
+
+        return BRIDGE.loading;
+    }
+
+    async function loadSlovoMLBridge() {
+        if (slovoMLBridgeModel && BRIDGE.loaded) return true;
+        if (slovoMLBridgeLoading) return slovoMLBridgeLoading;
+
+        slovoMLBridgeLoading = (async function () {
+            const status = document.getElementById("dbStatus");
+
+            await loadBridgeData();
+
+            try {
+                if (typeof SlovoTranslator === "undefined") {
+                    console.warn("Brak SlovoTranslator. Sprawdź kolejność skryptów w index.html.");
+                    if (status) status.innerText = "JSON Declension Engine Ready.";
+                    return true;
+                }
+
+                slovoMLBridgeModel = await SlovoTranslator.loadFromUrl("model/slovo-model.json");
+
+                console.log("Slovo ML model loaded.");
+                if (status) status.innerText = "ML + Declension Engine Ready.";
+                return true;
+            } catch (e) {
+                console.warn("Nie udało się załadować modelu ML, działa indeks z JSON:", e);
+                slovoMLBridgeModel = null;
+
+                if (status) status.innerText = "JSON Declension Engine Ready.";
+                return true;
+            }
+        })();
+
+        return slovoMLBridgeLoading;
+    }
+
+    function mapForDirection(direction) {
+        return direction === "slo2pl" ? BRIDGE.slo2pl : BRIDGE.pl2slo;
+    }
+
+    function sentenceMapForDirection(direction) {
+        return direction === "slo2pl" ? BRIDGE.sentSlo2Pl : BRIDGE.sentPl2Slo;
+    }
+
+    function lookupSentence(text, direction) {
+        const map = sentenceMapForDirection(direction);
+        const key = normalizeSentenceKey(text);
+        const hit = map.get(key);
+        if (!hit) return null;
+
+        return alignTerminalPunctuation(hit.target, text);
+    }
+
+    function alignTerminalPunctuation(target, source) {
+        const sourcePunct = getTerminalPunct(source);
+        let out = String(target ?? "").trim();
+
+        if (sourcePunct) {
+            out = stripTerminalPunct(out) + sourcePunct;
+        } else {
+            out = stripTerminalPunct(out);
+        }
+
+        return out;
+    }
+
+    function buildPhraseFromTokens(tokens, startIndex, maxWords) {
         let phrase = "";
         let usedWords = 0;
-        let best = null;
+        let endIndex = startIndex;
 
         for (let i = startIndex; i < tokens.length; i++) {
             const token = tokens[i];
@@ -170,37 +572,93 @@
             if (isWord(token)) {
                 phrase += token;
                 usedWords++;
+                endIndex = i + 1;
 
-                const value = dict[normalizeKey(phrase)];
-                if (value) {
-                    best = {
-                        source: phrase,
-                        target: value,
-                        endIndex: i + 1,
-                        words: usedWords
-                    };
-                }
-
-                if (usedWords >= MAX_PHRASE_WORDS) break;
+                if (usedWords >= maxWords) break;
                 continue;
             }
 
             if (isSpace(token)) {
                 phrase += " ";
+                endIndex = i + 1;
                 continue;
             }
 
             break;
         }
 
+        return {
+            phrase: phrase.trim(),
+            words: usedWords,
+            endIndex
+        };
+    }
+
+    function findBestPhrase(tokens, startIndex, direction) {
+        const map = mapForDirection(direction);
+        let best = null;
+
+        for (let max = MAX_PHRASE_WORDS; max >= 1; max--) {
+            const built = buildPhraseFromTokens(tokens, startIndex, max);
+            if (!built.phrase || built.words < 1) continue;
+
+            const candidates = map.get(normalizeKey(built.phrase));
+            if (!candidates || !candidates.length) continue;
+
+            const candidate = chooseCandidate(candidates, built.phrase, tokens, startIndex, direction);
+            if (!candidate) continue;
+
+            const score = candidateScore(candidate, built.phrase, tokens, startIndex, direction) + built.words * 50;
+
+            if (!best || score > best.score) {
+                best = {
+                    source: built.phrase,
+                    target: candidate.target,
+                    endIndex: built.endIndex,
+                    score,
+                    words: built.words
+                };
+            }
+        }
+
         return best;
     }
 
-    function translateByLocalDictionary(text, direction) {
-        const protectedText = protectSpecialText(text);
+    function maybeReorderSlovian(text) {
+        if (!USE_REORDER_SMART) return text;
+
+        if (typeof reorderSmart === "function") {
+            try {
+                return reorderSmart(text);
+            } catch (e) {
+                return text;
+            }
+        }
+
+        return text;
+    }
+
+    function fixOutputSpacing(text) {
+        return String(text ?? "")
+            .replace(/\s+([,.;:!?%])/g, "$1")
+            .replace(/([([{„«])\s+/g, "$1")
+            .replace(/\s+([)\]}”»])/g, "$1")
+            .replace(/\s+—\s+/g, " — ")
+            .replace(/\s+-\s+/g, " - ")
+            .replace(/\s+/g, " ")
+            .trim();
+    }
+
+    function translateByIndexedData(text, direction) {
+        const original = String(text ?? "");
+        if (!original.trim()) return "";
+
+        const sentenceHit = lookupSentence(original, direction);
+        if (sentenceHit) return sentenceHit;
+
+        const protectedText = protectSpecialText(original);
         const tokens = protectedText.text.match(TOKEN_RE) || [protectedText.text];
         const out = [];
-
         let changed = false;
 
         for (let i = 0; i < tokens.length; i++) {
@@ -211,7 +669,7 @@
                 continue;
             }
 
-            const best = findBestLocalPhrase(tokens, i, direction);
+            const best = findBestPhrase(tokens, i, direction);
 
             if (best && best.target) {
                 out.push(applyCaseLike(best.source, best.target));
@@ -223,178 +681,63 @@
             out.push(token);
         }
 
-        const result = protectedText.restore(out.join(""));
-        return {
-            text: result,
-            changed
-        };
+        const restored = protectedText.restore(out.join(""));
+        return changed ? fixOutputSpacing(restored) : original;
     }
 
-    function maybeReorderSlovian(text) {
-        if (typeof reorderSmart === "function") {
-            try {
-                return reorderSmart(text);
-            } catch (e) {
-                return text;
+    function modelFallback(text, direction) {
+        if (!slovoMLBridgeModel) return null;
+
+        const wc = wordCount(text);
+        if (wc <= 1 && !TRUST_MODEL_SINGLE_WORD && !USE_GUESS_FALLBACK) return null;
+
+        try {
+            if (direction === "slo2pl") {
+                const result = slovoMLBridgeModel.translateSlovianToPolish(text, {
+                    fallback: "copy"
+                });
+
+                return sameNormalized(result, text) ? null : result;
             }
+
+            const result = slovoMLBridgeModel.translatePolishToSlovian(text, {
+                fallback: USE_GUESS_FALLBACK ? "guess" : "copy"
+            });
+
+            return sameNormalized(result, text) ? null : result;
+        } catch (e) {
+            console.warn("Błąd fallbacku ML:", e);
+            return null;
         }
-        return text;
     }
 
-    function fixOutputSpacing(text) {
-        return String(text ?? "")
-            .replace(/\s+([,.;:!?])/g, "$1")
-            .replace(/([([{])\s+/g, "$1")
-            .replace(/\s+([)\]}])/g, "$1")
-            .replace(/\s+/g, " ")
-            .trim();
-    }
+    function translateDirection(text, direction) {
+        const original = String(text ?? "");
+        if (!original.trim()) return "";
 
-    async function loadSlovoMLBridge() {
-        if (slovoMLBridgeModel) return true;
-        if (slovoMLBridgeLoading) return slovoMLBridgeLoading;
+        const indexed = translateByIndexedData(original, direction);
+        if (!sameNormalized(indexed, original)) {
+            return direction === "pl2slo"
+                ? maybeReorderSlovian(fixOutputSpacing(indexed))
+                : fixOutputSpacing(indexed);
+        }
 
-        slovoMLBridgeLoading = (async function () {
-            const status = document.getElementById("dbStatus");
+        const model = modelFallback(original, direction);
+        if (model) {
+            return direction === "pl2slo"
+                ? maybeReorderSlovian(fixOutputSpacing(alignTerminalPunctuation(model, original)))
+                : fixOutputSpacing(alignTerminalPunctuation(model, original));
+        }
 
-            try {
-                if (typeof SlovoTranslator === "undefined") {
-                    console.warn("Brak SlovoTranslator. Sprawdź kolejność skryptów w index.html.");
-                    if (status) status.innerText = "Dictionary Engine Ready.";
-                    return false;
-                }
-
-                slovoMLBridgeModel = await SlovoTranslator.loadFromUrl("model/slovo-model.json");
-
-                console.log("Slovo ML model loaded.");
-                if (status) status.innerText = "ML Engine Ready.";
-                return true;
-
-            } catch (e) {
-                console.warn("Nie udało się załadować modelu ML:", e);
-                slovoMLBridgeModel = null;
-
-                if (status) status.innerText = "Dictionary Engine Ready.";
-                return false;
-            }
-        })();
-
-        return slovoMLBridgeLoading;
+        return original;
     }
 
     function translatePlToSloML(text) {
-        const original = String(text ?? "");
-
-        if (!original.trim()) return "";
-
-        /*
-         * 1. Najpierw dokładny wpis z osnova/vuzor.
-         * To jest najważniejsze, bo tu są poprawne końcówki: ь, ъ, ǫ, ę itd.
-         */
-        const localExact = localLookup(original, "pl2slo");
-        if (localExact) {
-            return applyCaseLike(original, localExact);
-        }
-
-        /*
-         * 2. Dla całych zdań/fraz można zaufać modelowi,
-         * ale nie dla pojedynczych słów, jeśli TRUST_MODEL_SINGLE_WORD = false.
-         */
-        const allowSingleWordModel = TRUST_MODEL_SINGLE_WORD;
-        const modelExact = modelLookup(original, "pl2slo", allowSingleWordModel);
-        if (modelExact) {
-            return applyCaseLike(original, modelExact);
-        }
-
-        /*
-         * 3. Potem frazy i słowa z osnova/vuzor wewnątrz tekstu.
-         */
-        const localPhrase = translateByLocalDictionary(original, "pl2slo");
-        if (localPhrase.changed) {
-            return maybeReorderSlovian(fixOutputSpacing(localPhrase.text));
-        }
-
-        /*
-         * 4. Dopiero potem model dla dłuższego tekstu.
-         * Przy fallback: "copy" nie zgaduje nieznanych słów.
-         */
-        if (slovoMLBridgeModel) {
-            const wc = wordCount(original);
-
-            if (wc > 1 || USE_GUESS_FALLBACK) {
-                try {
-                    const result = slovoMLBridgeModel.translatePolishToSlovian(original, {
-                        fallback: USE_GUESS_FALLBACK ? "guess" : "copy"
-                    });
-
-                    if (!sameNormalized(result, original) || USE_GUESS_FALLBACK) {
-                        return maybeReorderSlovian(fixOutputSpacing(result));
-                    }
-                } catch (e) {
-                    console.warn("Błąd tłumaczenia PL→SLO przez model:", e);
-                }
-            }
-        }
-
-        /*
-         * 5. Jeżeli słowa nie ma w bazie, nie zgaduj.
-         * To zapobiega błędom typu brak końcowego ь.
-         */
-        return original;
+        return translateDirection(text, "pl2slo");
     }
 
     function translateSloToPlML(text) {
-        const original = String(text ?? "");
-
-        if (!original.trim()) return "";
-
-        /*
-         * 1. Najpierw dokładny wpis z odwróconego osnova/vuzor.
-         */
-        const localExact = localLookup(original, "slo2pl");
-        if (localExact) {
-            return applyCaseLike(original, localExact);
-        }
-
-        /*
-         * 2. Model tylko dla zdań/fraz albo gdy jawnie pozwolisz na pojedyncze słowa.
-         */
-        const allowSingleWordModel = TRUST_MODEL_SINGLE_WORD;
-        const modelExact = modelLookup(original, "slo2pl", allowSingleWordModel);
-        if (modelExact) {
-            return applyCaseLike(original, modelExact);
-        }
-
-        /*
-         * 3. Frazy i słowa z lokalnego słownika.
-         */
-        const localPhrase = translateByLocalDictionary(original, "slo2pl");
-        if (localPhrase.changed) {
-            return fixOutputSpacing(localPhrase.text);
-        }
-
-        /*
-         * 4. Model dla dłuższego tekstu, bez zgadywania nieznanych słów.
-         */
-        if (slovoMLBridgeModel) {
-            const wc = wordCount(original);
-
-            if (wc > 1 || USE_GUESS_FALLBACK) {
-                try {
-                    const result = slovoMLBridgeModel.translateSlovianToPolish(original, {
-                        fallback: "copy"
-                    });
-
-                    if (!sameNormalized(result, original)) {
-                        return fixOutputSpacing(result);
-                    }
-                } catch (e) {
-                    console.warn("Błąd tłumaczenia SLO→PL przez model:", e);
-                }
-            }
-        }
-
-        return original;
+        return translateDirection(text, "slo2pl");
     }
 
     const oldLoadDictionaries = typeof loadDictionaries === "function" ? loadDictionaries : null;
@@ -410,6 +753,8 @@
         } catch (e) {}
 
         window.loadDictionaries = patchedLoadDictionaries;
+    } else {
+        loadSlovoMLBridge();
     }
 
     const oldTranslate = typeof translate === "function" ? translate : null;
@@ -432,32 +777,26 @@
                 return;
             }
 
-            if (!slovoMLBridgeModel) {
-                await loadSlovoMLBridge();
-            }
+            await loadSlovoMLBridge();
 
             try {
                 let finalResult = "";
 
                 if (src === "slo" && tgt === "pl") {
                     finalResult = translateSloToPlML(text);
-
                 } else if (src === "pl" && tgt === "slo") {
                     finalResult = translatePlToSloML(text);
-
                 } else if (src === "slo") {
                     const bridge = translateSloToPlML(text);
                     finalResult = typeof google === "function"
                         ? await google(bridge, "pl", tgt)
                         : bridge;
-
                 } else if (tgt === "slo") {
                     const bridge = typeof google === "function"
                         ? await google(text, src, "pl")
                         : text;
 
                     finalResult = translatePlToSloML(bridge);
-
                 } else {
                     finalResult = typeof google === "function"
                         ? await google(text, src, tgt)
@@ -465,7 +804,6 @@
                 }
 
                 out.innerText = finalResult || "";
-
             } catch (e) {
                 console.error("Błąd ML bridge, powrót do starego tłumacza:", e);
                 return oldTranslate();
@@ -482,4 +820,5 @@
     window.loadSlovoMLBridge = loadSlovoMLBridge;
     window.translatePlToSloML = translatePlToSloML;
     window.translateSloToPlML = translateSloToPlML;
+    window.__slovoBridge = BRIDGE;
 })();
