@@ -1,6 +1,6 @@
 /* slovo_ml_bridge.js
  * Warstwa ML + odmiana kontekstowa + interpunkcja do starego script.js.
- * v4: wymusza przypadek po przyimku przez formy z vuzor.json.
+ * v5: szybka korekta wejścia + odmiana + bez zawieszania po wklejeniu.
  *
  * Ładuj w index.html dokładnie w tej kolejności:
  * <script src="slovo_model.js"></script>
@@ -1220,6 +1220,10 @@
     }
 
     function maybeReorderSlovian(text) {
+        // Własne porządkowanie działa zawsze dla sąsiadujących grup:
+        // rzeczownik + przymiotnik -> przymiotnik + rzeczownik,
+        // rzeczownik + liczebnik -> liczebnik + rzeczownik,
+        // rzeczownik + przymiotnik + liczebnik -> liczebnik + przymiotnik + rzeczownik.
         let result = reorderSlovianAdjacentGroups(text);
 
         if (USE_REORDER_SMART && typeof reorderSmart === "function") {
@@ -1228,7 +1232,7 @@
             } catch (e) {}
         }
 
-        return result;
+        return fixOutputSpacing(result);
     }
 
     function fixOutputSpacing(text) {
@@ -1376,10 +1380,15 @@
                 let finalResult = "";
                 let workingText = text;
 
-                if (src !== "slo") {
-                    const prepared = await prepareInputForTranslation(text, src, tgt);
+                if (src !== "slo" && typeof prepareInputForTranslation === "function") {
+                    // Korekta nie może blokować tłumaczenia. Gdy Google albo sieć się zawiesi,
+                    // po 1000 ms tłumaczymy tekst oryginalny.
+                    const prepared = await Promise.race([
+                        prepareInputForTranslation(text, src, tgt),
+                        new Promise(resolve => setTimeout(() => resolve({ text: text }), 1000))
+                    ]);
                     workingText = prepared.text || text;
-                } else {
+                } else if (src === "slo") {
                     hideCorrectionSuggestion();
                 }
 

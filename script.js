@@ -382,29 +382,36 @@ async function google(text, s, t) {
     return await googleRaw(text, s, t);
 }
 
+function withTimeout(promise, ms, fallback) {
+    return Promise.race([
+        promise,
+        new Promise(resolve => setTimeout(() => resolve(fallback), ms))
+    ]);
+}
+
 async function getGoogleCorrectedInput(text, lang) {
     const original = String(text || "");
     const key = `${lang}::${original}`;
     if (correctionCache.has(key)) return correctionCache.get(key);
 
-    // Google Translate przy sl=pl&tl=pl zwykle nie poprawia literówek.
-    // Dlatego dla polskiego najpierw robimy korektę z lokalnych haseł osnova/vuzor.
+    // Polski poprawiamy lokalnie z osnova/vuzor. Nie odpalamy Google PL→PL,
+    // bo często nic nie poprawia, a potrafi blokować tłumaczenie po wklejeniu tekstu.
     let corrected = localCorrectText(original, lang);
-
-    if (normalizeCorrectionCompare(corrected) === normalizeCorrectionCompare(original)) {
-        try {
-            corrected = await googleRaw(original, lang, lang);
-            if (!corrected || !corrected.trim()) corrected = original;
-        } catch (e) {
-            corrected = original;
-        }
+    if (lang === "pl") {
+        correctionCache.set(key, corrected);
+        return corrected;
     }
 
-    if (normalizeCorrectionCompare(corrected) === normalizeCorrectionCompare(original) && lang !== "pl") {
-        try {
-            const autoCorrected = await googleRaw(original, "auto", lang);
-            if (autoCorrected && autoCorrected.trim()) corrected = autoCorrected;
-        } catch (e) {}
+    // Dla innych języków próbujemy Google, ale z krótkim limitem czasu.
+    // Jeżeli Google nie odpowie szybko, tłumaczenie idzie dalej bez zawieszenia.
+    if (normalizeCorrectionCompare(corrected) === normalizeCorrectionCompare(original)) {
+        corrected = await withTimeout(googleRaw(original, lang, lang), 900, original);
+        if (!corrected || !corrected.trim()) corrected = original;
+    }
+
+    if (normalizeCorrectionCompare(corrected) === normalizeCorrectionCompare(original)) {
+        const autoCorrected = await withTimeout(googleRaw(original, "auto", lang), 900, original);
+        if (autoCorrected && autoCorrected.trim()) corrected = autoCorrected;
     }
 
     correctionCache.set(key, corrected);
