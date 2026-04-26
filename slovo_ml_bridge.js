@@ -1,6 +1,6 @@
 /* slovo_ml_bridge.js
  * Stabilna warstwa ML + JSON + odmiana + szyk części mowy.
- * v9: czerwony znacznik braków + tworzenie odmian z lematów i wzorców z vuzor/osnova.
+ * v10: grupy przypadkowe przez przecinki + dynamiczne wzorce odmiany z vuzor/osnova.
  *
  * Ładuj w index.html dokładnie w tej kolejności:
  * <script src="slovo_model.js"></script>
@@ -22,7 +22,8 @@
         sentSlo2Pl: new Map(),
         formsByLemmaPl2Slo: new Map(),
         formsByLemmaSlo2Pl: new Map(),
-        stats: { entries: 0, sentences: 0, lemmaForms: 0 }
+        declensionPatterns: new Map(),
+        stats: { entries: 0, sentences: 0, lemmaForms: 0, patterns: 0 }
     };
 
     const USE_GUESS_FALLBACK = false;
@@ -72,7 +73,17 @@
         { polish: "dwu", slovian: "duvoh", typeCase: "numeral - ličebьnik | genitive - rodilьnik | plural - munoga ličьba", priority: 950 },
         { polish: "dwoma", slovian: "duvoma", typeCase: "numeral - ličebьnik | instrumental - orǫdьnik | plural - munoga ličьba", priority: 950 },
         { polish: "dwa", slovian: "dva", typeCase: "numeral - ličebьnik | nominative - jimenovьnik | plural - munoga ličьba", priority: 940 },
-        { polish: "dwie", slovian: "dvě", typeCase: "numeral - ličebьnik | nominative - jimenovьnik | plural - munoga ličьba", priority: 940 }
+        { polish: "dwie", slovian: "dvě", typeCase: "numeral - ličebьnik | nominative - jimenovьnik | plural - munoga ličьba", priority: 940 },
+
+        { polish: "moich", slovian: "mojih", typeCase: "adjective pronoun - zajimenьnik | genitive - rodilьnik | plural - munoga ličьba", priority: 970 },
+        { polish: "moimi", slovian: "mojimi", typeCase: "adjective pronoun - zajimenьnik | instrumental - orǫdьnik | plural - munoga ličьba", priority: 950 },
+        { polish: "moim", slovian: "mojim", typeCase: "adjective pronoun - zajimenьnik | dative - měrьnik | singular - poedinьna ličьba", priority: 930 },
+        { polish: "mój", slovian: "mojь", typeCase: "adjective pronoun - zajimenьnik | nominative - jimenovьnik | singular - poedinьna ličьba", priority: 930 },
+        { polish: "moja", slovian: "moja", typeCase: "adjective pronoun - zajimenьnik | nominative - jimenovьnik | singular - poedinьna ličьba", priority: 930 },
+        { polish: "moje", slovian: "moje", typeCase: "adjective pronoun - zajimenьnik | nominative - jimenovьnik | plural - munoga ličьba", priority: 930 },
+        { polish: "moi", slovian: "moji", typeCase: "adjective pronoun - zajimenьnik | nominative - jimenovьnik | plural - munoga ličьba", priority: 930 },
+        { polish: "mojego", slovian: "mojego", typeCase: "adjective pronoun - zajimenьnik | genitive - rodilьnik | singular - poedinьna ličьba", priority: 930 },
+        { polish: "moją", slovian: "mojǫ", typeCase: "adjective pronoun - zajimenьnik | accusative - vinьnik | singular - poedinьna ličьba", priority: 930 }
     ];
 
     const ACCUSATIVE_VERBS = new Set([
@@ -317,8 +328,13 @@
         return type === "determiner" || type === "numeral" || type === "adjective";
     }
 
+    function isSoftPhrasePunctuation(token) {
+        return /^[,،;:]$/.test(String(token || ""));
+    }
+
     function findCaseFromEarlierPreposition(tokens, startIndex, direction) {
         let seenWords = 0;
+        let crossedSoftPunctuation = 0;
 
         for (let i = startIndex - 1; i >= 0; i--) {
             const token = tokens[i];
@@ -326,6 +342,12 @@
             if (isSpace(token)) continue;
 
             if (!isWord(token)) {
+                // Przecinek w środku grupy nominalnej nie może urywać przypadka:
+                // "bez tych dwóch, moich radości" → wszystko zostaje genitive plural.
+                if (isSoftPhrasePunctuation(token) && crossedSoftPunctuation < 2 && seenWords <= 8) {
+                    crossedSoftPunctuation++;
+                    continue;
+                }
                 if (seenWords === 0) continue;
                 break;
             }
@@ -338,7 +360,7 @@
             }
 
             if (canSkipForCaseSearch(word, direction)) {
-                if (seenWords <= 5) continue;
+                if (seenWords <= 8) continue;
             }
 
             break;
@@ -348,18 +370,24 @@
     }
 
     function findNumberFromNearbyWords(tokens, startIndex, direction) {
-        for (let i = startIndex - 1, seen = 0; i >= 0 && seen < 4; i--) {
+        for (let i = startIndex - 1, seen = 0, soft = 0; i >= 0 && seen < 8; i--) {
             if (isSpace(tokens[i])) continue;
-            if (!isWord(tokens[i])) break;
+            if (!isWord(tokens[i])) {
+                if (isSoftPhrasePunctuation(tokens[i]) && soft < 2) { soft++; continue; }
+                break;
+            }
             seen++;
             const list = mapForDirection(direction || "pl2slo").get(normalizeKey(tokens[i]));
             if (list && list.some(c => c.meta && c.meta.number === "plural")) return "plural";
             if (list && list.some(c => c.meta && c.meta.wordClass === "numeral")) return "plural";
         }
 
-        for (let i = startIndex + 1, seen = 0; i < tokens.length && seen < 3; i++) {
+        for (let i = startIndex + 1, seen = 0, soft = 0; i < tokens.length && seen < 6; i++) {
             if (isSpace(tokens[i])) continue;
-            if (!isWord(tokens[i])) break;
+            if (!isWord(tokens[i])) {
+                if (isSoftPhrasePunctuation(tokens[i]) && soft < 2) { soft++; continue; }
+                break;
+            }
             seen++;
             const list = mapForDirection(direction || "pl2slo").get(normalizeKey(tokens[i]));
             if (list && list.some(c => c.meta && c.meta.number === "plural")) return "plural";
@@ -547,6 +575,11 @@
             add(w.slice(0, -1) + "e");
         }
 
+        if (w.endsWith("ści")) add(w.slice(0, -3) + "ść");
+        if (w.endsWith("ości")) add(w.slice(0, -4) + "ość");
+        if (w.endsWith("ci")) add(w.slice(0, -2) + "ć");
+        if (w.endsWith("i")) add(w.slice(0, -1));
+        if (w.endsWith("y")) add(w.slice(0, -1) + "a");
         if (w.endsWith("u")) add(w.slice(0, -1));
         if (w.endsWith("owi")) add(w.slice(0, -3));
         if (w.endsWith("em")) add(w.slice(0, -2));
@@ -557,8 +590,116 @@
         return out;
     }
 
+    function targetEndingClass(target, meta) {
+        const t = normalizeKey(target || "");
+        if (t.endsWith("ostь")) return "ostь";
+        if (t.endsWith("ьje")) return "ьje";
+        if (t.endsWith("je")) return "je";
+        if (t.endsWith("ę")) return "ę";
+        if (t.endsWith("o")) return "o";
+        if (t.endsWith("a")) return "a";
+        if (t.endsWith("ь")) return "ь";
+        if (/[kgxhščž]$/.test(t)) return "hard-cons";
+        if (/[bcćčdđfghjklłmnńprsśštvzźż]$/.test(t)) return "cons";
+        return "other";
+    }
+
+    function declensionPatternKey(meta, target, grammaticalCase, number) {
+        return [
+            meta && meta.wordClass || "noun",
+            meta && meta.gender || "",
+            meta && meta.animacy || "",
+            targetEndingClass(target, meta),
+            grammaticalCase || "",
+            number || ""
+        ].join("|");
+    }
+
+    function suffixTransform(base, form) {
+        base = String(base || "");
+        form = String(form || "");
+        let i = 0;
+        const a = Array.from(base), b = Array.from(form);
+        while (i < a.length && i < b.length && a[i] === b[i]) i++;
+        return { from: a.slice(i).join(""), to: b.slice(i).join("") };
+    }
+
+    function applySuffixTransform(base, tr) {
+        base = String(base || "");
+        if (!tr) return null;
+        if (tr.from && !base.endsWith(tr.from)) return null;
+        if (!tr.from) return base + tr.to;
+        return base.slice(0, base.length - tr.from.length) + tr.to;
+    }
+
+    function buildDeclensionPatterns() {
+        const baseByLemma = new Map();
+
+        BRIDGE.pl2slo.forEach(function (list) {
+            for (const c of list || []) {
+                const m = c && c.meta;
+                if (!m || m.wordClass !== "noun" || !m.lemma) continue;
+                if (m.grammaticalCase === "nominative" && m.number === "singular") {
+                    if (!baseByLemma.has(m.lemma)) baseByLemma.set(m.lemma, c);
+                }
+            }
+        });
+
+        BRIDGE.pl2slo.forEach(function (list) {
+            for (const c of list || []) {
+                const m = c && c.meta;
+                if (!m || m.wordClass !== "noun" || !m.lemma || !m.grammaticalCase) continue;
+                const base = baseByLemma.get(m.lemma);
+                if (!base || !base.target || !c.target) continue;
+                if (base.target === c.target && m.grammaticalCase === "nominative" && m.number === "singular") continue;
+
+                const key = declensionPatternKey(base.meta || m, base.target, m.grammaticalCase, m.number || "");
+                const tr = suffixTransform(base.target, c.target);
+                if (!tr) continue;
+
+                const bucket = BRIDGE.declensionPatterns.get(key) || [];
+                const existing = bucket.find(x => x.from === tr.from && x.to === tr.to);
+                if (existing) existing.count++;
+                else bucket.push({ ...tr, count: 1, exampleBase: base.target, exampleForm: c.target });
+                bucket.sort((a, b) => b.count - a.count);
+                BRIDGE.declensionPatterns.set(key, bucket);
+                BRIDGE.stats.patterns++;
+            }
+        });
+    }
+
+    function guessSlovianByDynamicPattern(baseCandidate, wantedCase, wantedNumber) {
+        if (!baseCandidate || !baseCandidate.target || !wantedCase) return null;
+        const meta = baseCandidate.meta || {};
+        if (meta.wordClass !== "noun") return null;
+
+        const number = wantedNumber || meta.number || "singular";
+        const keys = [
+            declensionPatternKey(meta, baseCandidate.target, wantedCase, number),
+            declensionPatternKey({ ...meta, animacy: "" }, baseCandidate.target, wantedCase, number),
+            declensionPatternKey({ ...meta, gender: "", animacy: "" }, baseCandidate.target, wantedCase, number),
+            declensionPatternKey(meta, baseCandidate.target, wantedCase, "")
+        ];
+
+        const seen = new Set();
+        for (const key of keys) {
+            if (seen.has(key)) continue;
+            seen.add(key);
+            const bucket = BRIDGE.declensionPatterns.get(key);
+            if (!bucket || !bucket.length) continue;
+            for (const tr of bucket.slice(0, 8)) {
+                const out = applySuffixTransform(baseCandidate.target, tr);
+                if (out) return out;
+            }
+        }
+
+        return null;
+    }
+
     function guessSlovianByRules(baseCandidate, wantedCase, wantedNumber) {
         if (!baseCandidate || !baseCandidate.target || !wantedCase) return null;
+        const dynamic = guessSlovianByDynamicPattern(baseCandidate, wantedCase, wantedNumber);
+        if (dynamic) return dynamic;
         const stem = String(baseCandidate.target);
         const meta = baseCandidate.meta || {};
         const gender = meta.gender;
@@ -707,8 +848,9 @@
                 }
             } catch (e) {}
             sortBridgeMaps();
+            buildDeclensionPatterns();
             BRIDGE.loaded = true;
-            console.log("Slovo bridge data loaded:", BRIDGE.stats);
+            console.log("Slovo bridge data loaded:", BRIDGE.stats, "patterns:", BRIDGE.declensionPatterns.size);
             return true;
         })();
         return BRIDGE.loading;
