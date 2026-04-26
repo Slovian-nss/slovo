@@ -228,6 +228,132 @@ function shouldCorrectInput(text, src, tgt) {
     return true;
 }
 
+
+const LOCAL_CORRECTION_MAX_DISTANCE = 2;
+const LOCAL_CORRECTION_MIN_WORD_LENGTH = 4;
+const localCorrectionIndexCache = new Map();
+
+function getLocalCorrectionDict(src) {
+    try {
+        if (src === "pl" && typeof plToSlo !== "undefined") return plToSlo || {};
+        if (src === "slo" && typeof sloToPl !== "undefined") return sloToPl || {};
+    } catch (e) {}
+    return null;
+}
+
+function buildLocalCorrectionIndex(src) {
+    const cacheKey = src;
+    if (localCorrectionIndexCache.has(cacheKey)) return localCorrectionIndexCache.get(cacheKey);
+
+    const dict = getLocalCorrectionDict(src);
+    const index = new Map();
+
+    if (!dict) {
+        localCorrectionIndexCache.set(cacheKey, index);
+        return index;
+    }
+
+    Object.keys(dict).forEach(function (word) {
+        const w = normalizeCorrectionCompare(word);
+        if (!w || w.length < LOCAL_CORRECTION_MIN_WORD_LENGTH) return;
+        if (!/^[\p{L}\p{M}0-9'’]+$/u.test(w)) return;
+        const first = Array.from(w)[0] || "";
+        const len = Array.from(w).length;
+        const key = first + "|" + len;
+        if (!index.has(key)) index.set(key, []);
+        index.get(key).push(w);
+    });
+
+    localCorrectionIndexCache.set(cacheKey, index);
+    return index;
+}
+
+function levenshteinLimited(a, b, limit) {
+    const aa = Array.from(a);
+    const bb = Array.from(b);
+    if (Math.abs(aa.length - bb.length) > limit) return limit + 1;
+    if (a === b) return 0;
+
+    let prev = new Array(bb.length + 1);
+    let curr = new Array(bb.length + 1);
+    for (let j = 0; j <= bb.length; j++) prev[j] = j;
+
+    for (let i = 1; i <= aa.length; i++) {
+        curr[0] = i;
+        let rowMin = curr[0];
+        for (let j = 1; j <= bb.length; j++) {
+            const cost = aa[i - 1] === bb[j - 1] ? 0 : 1;
+            curr[j] = Math.min(prev[j] + 1, curr[j - 1] + 1, prev[j - 1] + cost);
+            if (curr[j] < rowMin) rowMin = curr[j];
+        }
+        if (rowMin > limit) return limit + 1;
+        [prev, curr] = [curr, prev];
+    }
+    return prev[bb.length];
+}
+
+function applyOriginalWordCase(original, corrected) {
+    const raw = String(original || "");
+    const c = String(corrected || "");
+    if (!c) return c;
+    if (raw.length > 1 && raw === raw.toLocaleUpperCase("pl")) return c.toLocaleUpperCase("pl");
+    if (raw[0] && raw[0] === raw[0].toLocaleUpperCase("pl") && raw[0] !== raw[0].toLocaleLowerCase("pl")) {
+        return c.charAt(0).toLocaleUpperCase("pl") + c.slice(1);
+    }
+    return c;
+}
+
+function findClosestLocalWord(word, src) {
+    const dict = getLocalCorrectionDict(src);
+    if (!dict) return null;
+
+    const normalized = normalizeCorrectionCompare(word);
+    if (!normalized || normalized.length < LOCAL_CORRECTION_MIN_WORD_LENGTH) return null;
+    if (Object.prototype.hasOwnProperty.call(dict, normalized)) return null;
+    if (!/^[\p{L}\p{M}0-9'’]+$/u.test(normalized)) return null;
+
+    const chars = Array.from(normalized);
+    const first = chars[0] || "";
+    const len = chars.length;
+    const index = buildLocalCorrectionIndex(src);
+
+    let best = null;
+    let bestDist = LOCAL_CORRECTION_MAX_DISTANCE + 1;
+
+    for (let l = len - LOCAL_CORRECTION_MAX_DISTANCE; l <= len + LOCAL_CORRECTION_MAX_DISTANCE; l++) {
+        const candidates = index.get(first + "|" + l) || [];
+        for (const candidate of candidates) {
+            const dist = levenshteinLimited(normalized, candidate, LOCAL_CORRECTION_MAX_DISTANCE);
+            if (dist < bestDist) {
+                bestDist = dist;
+                best = candidate;
+                if (dist === 1) break;
+            }
+        }
+        if (bestDist === 1) break;
+    }
+
+    if (!best || bestDist > LOCAL_CORRECTION_MAX_DISTANCE) return null;
+    return applyOriginalWordCase(word, best);
+}
+
+function localCorrectText(text, src) {
+    const original = String(text || "");
+    if (src !== "pl") return original;
+    const tokens = original.match(/([\p{L}\p{M}0-9'’]+|\s+|[^\s\p{L}\p{M}0-9'’]+)/gu) || [original];
+    let changed = false;
+    const correctedTokens = tokens.map(function (token) {
+        if (!/^[\p{L}\p{M}0-9'’]+$/u.test(token)) return token;
+        const corrected = findClosestLocalWord(token, src);
+        if (corrected && normalizeCorrectionCompare(corrected) !== normalizeCorrectionCompare(token)) {
+            changed = true;
+            return corrected;
+        }
+        return token;
+    });
+    return changed ? correctedTokens.join("") : original;
+}
+
 async function googleRaw(text, s, t) {
     try {
         const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${s}&tl=${t}&dt=t&q=${encodeURIComponent(text)}`;
@@ -250,12 +376,24 @@ async function getGoogleCorrectedInput(text, lang) {
     const key = `${lang}::${original}`;
     if (correctionCache.has(key)) return correctionCache.get(key);
 
-    let corrected = original;
-    try {
-        corrected = await googleRaw(original, lang, lang);
-        if (!corrected || !corrected.trim()) corrected = original;
-    } catch (e) {
-        corrected = original;
+    // Google Translate przy sl=pl&tl=pl zwykle nie poprawia literówek.
+    // Dlatego dla polskiego najpierw robimy korektę z lokalnych haseł osnova/vuzor.
+    let corrected = localCorrectText(original, lang);
+
+    if (normalizeCorrectionCompare(corrected) === normalizeCorrectionCompare(original)) {
+        try {
+            corrected = await googleRaw(original, lang, lang);
+            if (!corrected || !corrected.trim()) corrected = original;
+        } catch (e) {
+            corrected = original;
+        }
+    }
+
+    if (normalizeCorrectionCompare(corrected) === normalizeCorrectionCompare(original) && lang !== "pl") {
+        try {
+            const autoCorrected = await googleRaw(original, "auto", lang);
+            if (autoCorrected && autoCorrected.trim()) corrected = autoCorrected;
+        } catch (e) {}
     }
 
     correctionCache.set(key, corrected);
