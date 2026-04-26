@@ -1,6 +1,6 @@
 /* slovo_ml_bridge.js
  * Stabilna warstwa ML + JSON + odmiana + szyk części mowy.
- * v8: lepsze rozpoznawanie przypadków przez całą grupę: przyimek + zaimek + liczebnik + rzeczownik.
+ * v9: czerwony znacznik braków + tworzenie odmian z lematów i wzorców z vuzor/osnova.
  *
  * Ładuj w index.html dokładnie w tej kolejności:
  * <script src="slovo_model.js"></script>
@@ -183,7 +183,7 @@
     function parseMeta(typeCase) {
         const raw = String(typeCase || "");
         const info = normalizeKey(raw);
-        const meta = { raw, wordClass: "unknown", grammaticalCase: null, number: null, isPhrase: false, lemma: null };
+        const meta = { raw, wordClass: "unknown", grammaticalCase: null, number: null, gender: null, animacy: null, isPhrase: false, lemma: null };
 
         const lemmaMatch = raw.match(/jimenьnik\s*:\s*"([^"]+)"/i);
         if (lemmaMatch && lemmaMatch[1]) meta.lemma = normalizeKey(lemmaMatch[1]);
@@ -216,7 +216,14 @@
         else if (info.includes("vocative") || info.includes("zovanьnik")) meta.grammaticalCase = "vocative";
 
         if (info.includes("singular") || info.includes("poedinьna")) meta.number = "singular";
-        else if (info.includes("plural") || info.includes("munoga")) meta.number = "plural";
+        else if (info.includes("plural") || info.includes("munoga") || info.includes("munga")) meta.number = "plural";
+
+        if (info.includes("masculine") || info.includes("mǫž") || info.includes("męski")) meta.gender = "masculine";
+        else if (info.includes("feminine") || info.includes("žen") || info.includes("żeński")) meta.gender = "feminine";
+        else if (info.includes("neuter") || info.includes("nijak") || info.includes("nijaky")) meta.gender = "neuter";
+
+        if (info.includes("animate") || info.includes("život") || info.includes("żywot")) meta.animacy = "animate";
+        if (info.includes("inanimate") || info.includes("neživot") || info.includes("nieżywot")) meta.animacy = "inanimate";
 
         return meta;
     }
@@ -392,16 +399,18 @@
     }
 
     function inferWantedNumber(candidate, tokens, startIndex, sourceText, direction) {
-        if (!candidate || !candidate.meta) return null;
-
-        const direct = candidate.meta.number;
         const contextual = findNumberFromNearbyWords(tokens || [], startIndex || 0, direction);
-
         if (contextual === "plural") return "plural";
+
+        const direct = candidate && candidate.meta && candidate.meta.number;
         if (direct) return direct;
 
         const w = normalizeKey(sourceText);
-        if (/(owie|ami|ach|om|ów)$/.test(w)) return "plural";
+        if (/(owie|ami|ach|om|ów|mi)$/.test(w)) return "plural";
+        if (/(ci|ści|y|i|e|a)$/.test(w) && wordCount(w) === 1) {
+            // ostrożnie: polskie -a może być też lp., dlatego niżej tylko wtedy,
+            // gdy z kontekstu/przyimka i brak kandydata wymaga liczby mnogiej.
+        }
 
         return null;
     }
@@ -497,6 +506,129 @@
 
         const form = lookupLemmaForm(candidate, wantedCase, wantedNumber, direction);
         return form || candidate;
+    }
+
+    function cloneCandidateWith(candidate, target, extraMeta) {
+        return {
+            ...candidate,
+            target: String(target || candidate.target || ""),
+            generated: true,
+            meta: { ...(candidate.meta || {}), ...(extraMeta || {}) },
+            sourceFile: "generated-from-pattern"
+        };
+    }
+
+    function derivePolishLemmaCandidates(word, wantedCase, wantedNumber) {
+        const w = normalizeKey(word);
+        const out = [];
+        const add = v => {
+            v = normalizeKey(v);
+            if (v && !out.includes(v)) out.push(v);
+        };
+
+        add(w);
+
+        // Genitive plural neuter/feminine often has zero ending: miast -> miasto.
+        if (wantedCase === "genitive" && wantedNumber === "plural") {
+            add(w + "o");
+            add(w + "e");
+            add(w + "a");
+            if (w.endsWith("ek")) add(w.slice(0, -2) + "ko");
+            if (w.endsWith("ów")) {
+                add(w.slice(0, -2));
+                add(w.slice(0, -2) + "y");
+                add(w.slice(0, -2) + "a");
+            }
+        }
+
+        // Common Polish neuter plural/nominative/accusative: miasta -> miasto.
+        if (w.endsWith("a")) {
+            add(w.slice(0, -1) + "o");
+            add(w.slice(0, -1) + "e");
+        }
+
+        if (w.endsWith("u")) add(w.slice(0, -1));
+        if (w.endsWith("owi")) add(w.slice(0, -3));
+        if (w.endsWith("em")) add(w.slice(0, -2));
+        if (w.endsWith("ach")) add(w.slice(0, -3) + "o");
+        if (w.endsWith("om")) add(w.slice(0, -2) + "o");
+        if (w.endsWith("ami")) add(w.slice(0, -3) + "o");
+
+        return out;
+    }
+
+    function guessSlovianByRules(baseCandidate, wantedCase, wantedNumber) {
+        if (!baseCandidate || !baseCandidate.target || !wantedCase) return null;
+        const stem = String(baseCandidate.target);
+        const meta = baseCandidate.meta || {};
+        const gender = meta.gender;
+        const plural = wantedNumber === "plural";
+
+        if (meta.wordClass !== "noun") return null;
+
+        if (plural) {
+            if (wantedCase === "genitive") return stem;
+            if (wantedCase === "locative") return stem + "ěh";
+            if (wantedCase === "dative") return stem + "om";
+            if (wantedCase === "instrumental") return stem + "y";
+            if (wantedCase === "nominative") return gender === "feminine" ? stem.replace(/a$/, "y") : stem + "i";
+            if (wantedCase === "accusative") return gender === "feminine" ? stem.replace(/a$/, "y") : stem + "y";
+        }
+
+        if (wantedCase === "nominative") return stem;
+        if (wantedCase === "accusative") {
+            if (gender === "feminine" && /a$/.test(stem)) return stem.replace(/a$/, "ǫ");
+            return stem;
+        }
+        if (wantedCase === "genitive") {
+            if (gender === "feminine" && /a$/.test(stem)) return stem.replace(/a$/, "y");
+            return stem + "a";
+        }
+        if (wantedCase === "locative") return stem + "ě";
+        if (wantedCase === "dative") return stem + "u";
+        if (wantedCase === "instrumental") {
+            if (gender === "feminine" && /a$/.test(stem)) return stem.replace(/a$/, "ojǫ");
+            return stem + "omь";
+        }
+
+        return null;
+    }
+
+    function generateCandidateFromKnownLemma(word, tokens, index, direction) {
+        if (direction === "slo2pl") return null;
+
+        const wantedCase = inferWantedCase(tokens || [], index || 0, word, direction);
+        const wantedNumber = findNumberFromNearbyWords(tokens || [], index || 0, direction)
+            || ((wantedCase === "genitive" && /(ów|i|y)$/.test(normalizeKey(word))) ? "plural" : null)
+            || ((wantedCase === "genitive" && !/[ąćęłńóśźżaeiouy]$/i.test(normalizeKey(word))) ? "plural" : null);
+
+        const lemmaCandidates = derivePolishLemmaCandidates(word, wantedCase, wantedNumber);
+        for (const lemmaWord of lemmaCandidates) {
+            const list = BRIDGE.pl2slo.get(lemmaWord);
+            if (!list || !list.length) continue;
+
+            const base = chooseCandidate(list, lemmaWord, tokens || [], index || 0, direction);
+            if (!base || !base.target || !base.meta || base.meta.wordClass !== "noun") continue;
+
+            const wantedN = wantedNumber || base.meta.number || "singular";
+            const fromLemma = lookupLemmaForm(base, wantedCase, wantedN, direction);
+            if (fromLemma && fromLemma.target) {
+                return cloneCandidateWith(fromLemma, fromLemma.target, {
+                    grammaticalCase: wantedCase,
+                    number: wantedN
+                });
+            }
+
+            const guessed = guessSlovianByRules(base, wantedCase, wantedN);
+            if (guessed) {
+                return cloneCandidateWith(base, guessed, {
+                    grammaticalCase: wantedCase,
+                    number: wantedN
+                });
+            }
+        }
+
+        return null;
     }
 
     async function fetchJsonMaybe(url) {
@@ -625,7 +757,8 @@
     function lookupWordCandidate(word, tokens, index, direction) {
         const list = mapForDirection(direction).get(normalizeKey(word));
         const chosen = chooseCandidate(list, word, tokens, index, direction);
-        return chosen ? inflectCandidate(chosen, word, tokens, index, direction) : null;
+        if (chosen) return inflectCandidate(chosen, word, tokens, index, direction);
+        return generateCandidateFromKnownLemma(word, tokens, index, direction);
     }
 
     function tryBuildPhrase(tokens, startIndex, direction) {
@@ -718,6 +851,12 @@
             const single = lookupWordCandidate(token, tokens, i, direction);
             if (single && single.target) {
                 out.push(applyCaseLike(token, single.target));
+                changed = true;
+                continue;
+            }
+
+            if (direction === "pl2slo") {
+                out.push("🔴");
                 changed = true;
                 continue;
             }
