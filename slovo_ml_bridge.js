@@ -430,15 +430,21 @@
         const contextual = findNumberFromNearbyWords(tokens || [], startIndex || 0, direction);
         if (contextual === "plural") return "plural";
 
+        const w = normalizeKey(sourceText);
+
+        /*
+         * Najpierw końcówka wpisanej formy, potem liczba kandydata.
+         * Inaczej "ogrodach" trafiało do lematu "ogród" i dziedziczyło singular,
+         * przez co wychodziło obgordě zamiast obgorděh.
+         */
+        if (/(owie|ami|ach|ech|om|ów|mi)$/.test(w)) return "plural";
+
+        if (/(ci|ści|y|i|e|a)$/.test(w) && wordCount(w) === 1) {
+            // ostrożnie: polskie -a może być też lp.; zostawiamy bez decyzji.
+        }
+
         const direct = candidate && candidate.meta && candidate.meta.number;
         if (direct) return direct;
-
-        const w = normalizeKey(sourceText);
-        if (/(owie|ami|ach|om|ów|mi)$/.test(w)) return "plural";
-        if (/(ci|ści|y|i|e|a)$/.test(w) && wordCount(w) === 1) {
-            // ostrożnie: polskie -a może być też lp., dlatego niżej tylko wtedy,
-            // gdy z kontekstu/przyimka i brak kandydata wymaga liczby mnogiej.
-        }
 
         return null;
     }
@@ -533,7 +539,17 @@
         }
 
         const form = lookupLemmaForm(candidate, wantedCase, wantedNumber, direction);
-        return form || candidate;
+        if (form) return form;
+
+        const guessed = guessSlovianByRules(candidate, wantedCase, wantedNumber);
+        if (guessed) {
+            return cloneCandidateWith(candidate, guessed, {
+                grammaticalCase: wantedCase,
+                number: wantedNumber || candidate.meta.number || "singular"
+            });
+        }
+
+        return candidate;
     }
 
     function cloneCandidateWith(candidate, target, extraMeta) {
@@ -586,6 +602,18 @@
         if (w.endsWith("ach")) add(w.slice(0, -3) + "o");
         if (w.endsWith("om")) add(w.slice(0, -2) + "o");
         if (w.endsWith("ami")) add(w.slice(0, -3) + "o");
+
+
+        /*
+         * Polski ma alternację ó/o w odmianie: ogród → ogrodach/ogrodów/ogrody/ogrodzie.
+         * Bez tego silnik nie znajdował lematu "ogród" i dawał 🔴 albo przepuszczał obce słowo.
+         */
+        if (w.endsWith("odach")) add(w.slice(0, -5) + "ód");
+        if (w.endsWith("odów")) add(w.slice(0, -4) + "ód");
+        if (w.endsWith("ody")) add(w.slice(0, -3) + "ód");
+        if (w.endsWith("odzie")) add(w.slice(0, -5) + "ód");
+        if (w.endsWith("odem")) add(w.slice(0, -4) + "ód");
+        if (w.endsWith("odowi")) add(w.slice(0, -5) + "ód");
 
         // Przymiotniki i zaimki przymiotne: pięknych -> piękny, dużych -> duży,
         // moich -> mój/moje; pozwala potem użyć wzorców z vuzor/osnova.
@@ -711,20 +739,76 @@
         return null;
     }
 
+    function stripFinalForLocativePlural(base, ending) {
+        const value = String(base || "");
+        if (!value) return value;
+
+        if (ending === "ih") {
+            return value.endsWith("ь") ? value.slice(0, -1) : value;
+        }
+
+        if (ending === "ěh") {
+            // Dla o-/e-tematów miejscownik mnogi dodaje -ěh do tematu, nie do pełnej formy mianownika.
+            if (/[oeę]$/.test(value)) return value.slice(0, -1);
+            return value;
+        }
+
+        if (ending === "ah") {
+            // Żeńskie a-tematy: obětьnica -> obětьnicah, usluga -> uslugah.
+            if (/[aoeę]$/.test(value)) return value.slice(0, -1);
+            return value;
+        }
+
+        return value;
+    }
+
+    function nounLocativePluralByEndingRule(baseCandidate) {
+        if (!baseCandidate || !baseCandidate.target) return null;
+
+        const meta = baseCandidate.meta || {};
+        if (meta.wordClass !== "noun") return null;
+
+        const base = String(baseCandidate.target);
+        const normalized = normalizeKey(base);
+        const gender = meta.gender || "";
+
+        // 1. Każdy rzeczownik zakończony miękkim jerem -ь: -ih.
+        //    mǫdrostь -> mǫdrostih, hytrostь -> hytrostih.
+        if (normalized.endsWith("ь")) {
+            return stripFinalForLocativePlural(base, "ih") + "ih";
+        }
+
+        // 2. Każdy męski i nijaki rzeczownik: -ěh.
+        //    gord -> gorděh, obgord -> obgorděh.
+        if (gender === "masculine" || gender === "neuter") {
+            return stripFinalForLocativePlural(base, "ěh") + "ěh";
+        }
+
+        // 3. Pozostałe rzeczowniki: -ah.
+        //    obětьnica -> obětьnicah, usluga -> uslugah.
+        return stripFinalForLocativePlural(base, "ah") + "ah";
+    }
+
     function guessSlovianByRules(baseCandidate, wantedCase, wantedNumber) {
         if (!baseCandidate || !baseCandidate.target || !wantedCase) return null;
-        const dynamic = guessSlovianByDynamicPattern(baseCandidate, wantedCase, wantedNumber);
-        if (dynamic) return dynamic;
-        const stem = String(baseCandidate.target);
         const meta = baseCandidate.meta || {};
         const gender = meta.gender;
         const plural = wantedNumber === "plural";
 
         if (meta.wordClass !== "noun") return null;
 
+        if (plural && wantedCase === "locative") {
+            const locPlural = nounLocativePluralByEndingRule(baseCandidate);
+            if (locPlural) return locPlural;
+        }
+
+        const dynamic = guessSlovianByDynamicPattern(baseCandidate, wantedCase, wantedNumber);
+        if (dynamic) return dynamic;
+        const stem = String(baseCandidate.target);
+
         if (plural) {
             if (wantedCase === "genitive") return stem;
-            if (wantedCase === "locative") return stem + "ěh";
+            if (wantedCase === "locative") return nounLocativePluralByEndingRule(baseCandidate) || (stem + "ěh");
             if (wantedCase === "dative") return stem + "om";
             if (wantedCase === "instrumental") return stem + "y";
             if (wantedCase === "nominative") return gender === "feminine" ? stem.replace(/a$/, "y") : stem + "i";
@@ -754,9 +838,11 @@
         if (direction === "slo2pl") return null;
 
         const wantedCase = inferWantedCase(tokens || [], index || 0, word, direction);
+        const normalizedWord = normalizeKey(word);
         const wantedNumber = findNumberFromNearbyWords(tokens || [], index || 0, direction)
-            || ((wantedCase === "genitive" && /(ów|i|y)$/.test(normalizeKey(word))) ? "plural" : null)
-            || ((wantedCase === "genitive" && !/[ąćęłńóśźżaeiouy]$/i.test(normalizeKey(word))) ? "plural" : null);
+            || ((/(owie|ami|ach|ech|om|ów|mi)$/.test(normalizedWord)) ? "plural" : null)
+            || ((wantedCase === "genitive" && /(ów|i|y)$/.test(normalizedWord)) ? "plural" : null)
+            || ((wantedCase === "genitive" && !/[ąćęłńóśźżaeiouy]$/i.test(normalizedWord)) ? "plural" : null);
 
         const lemmaCandidates = derivePolishLemmaCandidates(word, wantedCase, wantedNumber);
         for (const lemmaWord of lemmaCandidates) {
