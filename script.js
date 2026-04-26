@@ -91,8 +91,13 @@ const STORAGE_KEYS = {
     uiLang: "uiLang",
     uiLangManual: "uiLangManual",
     srcLang: "srcLang",
-    tgtLang: "tgtLang"
+    srcLangManual: "srcLangManual",
+    tgtLang: "tgtLang",
+    tgtLangManual: "tgtLangManual",
+    settingsVersion: "slovoSettingsVersion"
 };
+
+const CURRENT_SETTINGS_VERSION = "12";
 
 function safeLocalGet(key) {
     try { return localStorage.getItem(key); } catch (e) { return null; }
@@ -160,6 +165,19 @@ function isSupportedUILanguage(code) {
 }
 
 function getStoredLanguage(key) {
+    /*
+     * Starsze wersje zapisywały srcLang/tgtLang automatycznie przy starcie,
+     * więc mogły blokować wykrywanie języka urządzenia.
+     * Od v12 zapis uznajemy tylko wtedy, gdy użytkownik sam zmienił select.
+     */
+    const manualKey = key === STORAGE_KEYS.srcLang
+        ? STORAGE_KEYS.srcLangManual
+        : key === STORAGE_KEYS.tgtLang
+            ? STORAGE_KEYS.tgtLangManual
+            : null;
+
+    if (manualKey && safeLocalGet(manualKey) !== "1") return null;
+
     const value = safeLocalGet(key);
     if (value && isSupportedLanguageCode(value)) return value;
     return null;
@@ -450,7 +468,7 @@ function shouldCorrectInput(text, src, tgt) {
     return true;
 }
 
-const LOCAL_CORRECTION_MAX_DISTANCE = 2;
+const LOCAL_CORRECTION_MAX_DISTANCE = 1;
 const LOCAL_CORRECTION_MIN_WORD_LENGTH = 4;
 const localCorrectionIndexCache = new Map();
 
@@ -826,6 +844,10 @@ async function loadDictionaries() {
 }
 
 async function init() {
+    /*
+     * UI i język źródłowy startują od języka urządzenia/przeglądarki.
+     * localStorage jest brany pod uwagę dopiero po ręcznej zmianie selecta.
+     */
     const uiKey = detectDefaultUILanguage();
     const displayLocale = getDisplayLocale(uiKey);
 
@@ -842,6 +864,8 @@ async function init() {
     if (srcSelect) srcSelect.value = pair.source;
     if (tgtSelect) tgtSelect.value = pair.target;
 
+    safeLocalSet(STORAGE_KEYS.settingsVersion, CURRENT_SETTINGS_VERSION);
+
     if (srcSelect) {
         srcSelect.addEventListener('change', (e) => {
             const selectedSrc = e.target.value;
@@ -851,9 +875,11 @@ async function init() {
                 selectedTgt = selectedSrc === "slo" ? "pl" : "slo";
                 if (tgtSelect) tgtSelect.value = selectedTgt;
                 safeLocalSet(STORAGE_KEYS.tgtLang, selectedTgt);
+                safeLocalSet(STORAGE_KEYS.tgtLangManual, "1");
             }
 
             safeLocalSet(STORAGE_KEYS.srcLang, selectedSrc);
+            safeLocalSet(STORAGE_KEYS.srcLangManual, "1");
             translate();
         });
     }
@@ -867,9 +893,11 @@ async function init() {
                 selectedSrc = selectedTgt === "slo" ? "pl" : "slo";
                 if (srcSelect) srcSelect.value = selectedSrc;
                 safeLocalSet(STORAGE_KEYS.srcLang, selectedSrc);
+                safeLocalSet(STORAGE_KEYS.srcLangManual, "1");
             }
 
             safeLocalSet(STORAGE_KEYS.tgtLang, selectedTgt);
+            safeLocalSet(STORAGE_KEYS.tgtLangManual, "1");
             translate();
         });
     }
@@ -877,18 +905,27 @@ async function init() {
     await loadDictionaries();
 
     const userInput = document.getElementById('userInput');
-    if (userInput) userInput.addEventListener('input', debounce(translate, 700));
+    if (userInput) {
+        userInput.setAttribute("spellcheck", "false");
+        userInput.setAttribute("autocorrect", "off");
+        userInput.setAttribute("autocapitalize", "off");
+        userInput.setAttribute("autocomplete", "off");
+        userInput.addEventListener('input', debounce(translate, 700));
+    }
 }
 
 function swapLanguages() {
     const src = document.getElementById('srcLang');
     const tgt = document.getElementById('tgtLang');
+
     if (!src || !tgt) return;
 
     [src.value, tgt.value] = [tgt.value, src.value];
 
     safeLocalSet(STORAGE_KEYS.srcLang, src.value);
+    safeLocalSet(STORAGE_KEYS.srcLangManual, "1");
     safeLocalSet(STORAGE_KEYS.tgtLang, tgt.value);
+    safeLocalSet(STORAGE_KEYS.tgtLangManual, "1");
 
     translate();
 }
