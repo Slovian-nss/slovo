@@ -679,9 +679,13 @@ function copyText() {
 async function pasteText() {
     try {
         const text = await navigator.clipboard.readText();
-        document.getElementById('userInput').value = text;
-        translate();
-    } catch(e) { console.log("Clipboard error"); }
+        const input = document.getElementById('userInput');
+        if (input) {
+            input.value = text;
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        if (typeof translate === 'function') await translate();
+    } catch(e) { console.log("Clipboard error", e); }
 }
 
 function debounce(func, wait) {
